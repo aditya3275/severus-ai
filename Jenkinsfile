@@ -7,12 +7,15 @@ pipeline {
         APP_PORT   = "8501"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
 
-        // Absolute paths (macOS Jenkins safe)
+        // macOS Jenkins fixes
         DOCKER_BIN  = "/usr/local/bin/docker"
+        DOCKER_HOST = "unix:///Users/aditya/.docker/run/docker.sock"
+
         PYTHON_BIN  = "/usr/bin/python3"
         HELM_BIN    = "/opt/homebrew/bin/helm"
         KUBECTL_BIN = "/opt/homebrew/bin/kubectl"
     }
+
 
     stages {
 
