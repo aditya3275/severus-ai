@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "adityahere/severus-ai"
         IMAGE_TAG  = "v1"
-        APP_PORT   = "8501"
+        APP_PORT   = "8503"
     }
 
     stages {
