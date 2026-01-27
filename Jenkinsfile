@@ -15,7 +15,7 @@ pipeline {
             }
         }
 
-        /* ------------------- NEW STAGES START ------------------- */
+        /* ================= APPLICATION QUALITY GATES ================= */
 
         stage('Application Build') {
             steps {
@@ -31,10 +31,13 @@ pipeline {
         stage('Application Run') {
             steps {
                 sh '''
-                    echo "🚀 Running application (smoke run)..."
-                    nohup python3 app.py > app.log 2>&1 &
+                    echo "🚀 Running Streamlit application (smoke run)..."
+                    nohup streamlit run app.py \
+                        --server.port=${APP_PORT} \
+                        --server.headless=true \
+                        > app.log 2>&1 &
                     echo $! > app.pid
-                    sleep 10
+                    sleep 15
                 '''
             }
         }
@@ -42,16 +45,15 @@ pipeline {
         stage('Application Test') {
             steps {
                 sh '''
-                    echo "🧪 Testing application..."
+                    echo "🧪 Testing Streamlit application..."
 
-                    # Check process still running
+                    # Check process exists
                     ps -p $(cat app.pid)
 
-                    # Basic sanity test (imports)
-                    python3 - <<EOF
-import app
-print("✅ App imports successfully")
-EOF
+                    # Check app is responding
+                    curl -f http://localhost:${APP_PORT} || exit 1
+
+                    echo "✅ Streamlit app is healthy"
 
                     # Cleanup
                     kill $(cat app.pid)
@@ -59,12 +61,13 @@ EOF
             }
         }
 
-        /* ------------------- NEW STAGES END ------------------- */
+        /* ================= DOCKER STAGES ================= */
 
         stage('Docker Build Image') {
             steps {
                 sh '''
-                    /usr/local/bin/docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                    echo "🐳 Building Docker image..."
+                    /usr/local/bin/docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
             }
         }
@@ -78,7 +81,7 @@ EOF
                 )]) {
                     sh '''
                         echo "$DOCKER_PASS" | /usr/local/bin/docker login -u "$DOCKER_USER" --password-stdin
-                        /usr/local/bin/docker push $IMAGE_NAME:$IMAGE_TAG
+                        /usr/local/bin/docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     '''
                 }
             }
@@ -87,16 +90,16 @@ EOF
         stage('Docker Run') {
             steps {
                 sh '''
-                    # Stop old container
+                    echo "🧹 Cleaning old container..."
                     /usr/local/bin/docker ps -q --filter "name=severus-ai" | xargs -r /usr/local/bin/docker stop
                     /usr/local/bin/docker ps -aq --filter "name=severus-ai" | xargs -r /usr/local/bin/docker rm
 
-                    # Run new container
+                    echo "🚀 Running new container..."
                     /usr/local/bin/docker run -d \
                         -p 8503:8501 \
                         -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
                         --name severus-ai \
-                        adityahere/severus-ai:v1
+                        ${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
