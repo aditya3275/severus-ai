@@ -35,10 +35,11 @@ pipeline {
 
                     nohup streamlit run app.py \
                         --server.port=${APP_PORT} \
+                        --server.address=0.0.0.0 \
                         --server.headless=true \
                         > app.log 2>&1 &
 
-                    sleep 20
+                    sleep 25
                 '''
             }
         }
@@ -48,12 +49,16 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
-                    # Check app is responding (REAL validation)
-                    curl --fail --retry 5 --retry-delay 3 http://localhost:${APP_PORT}
+                    echo "---- Streamlit logs (last 50 lines) ----"
+                    tail -n 50 app.log || true
+                    echo "---------------------------------------"
 
-                    echo "✅ Streamlit app is healthy"
+                    # Real health check (retry-based)
+                    curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
-                    # Kill Streamlit cleanly
+                    echo "✅ Streamlit app is reachable"
+
+                    # Cleanup
                     pkill -f "streamlit run app.py" || true
                 '''
             }
