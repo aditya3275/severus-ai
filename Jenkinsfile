@@ -121,7 +121,7 @@ pipeline {
                 sh '''
                     echo "☸️ Deploying Severus AI to Kubernetes using Helm..."
 
-                    helm upgrade --install severus-ai helm/severus-ai \
+                    /opt/homebrew/bin/helm upgrade --install severus-ai helm/severus-ai \
                     --set image.repository=adityahere/severus-ai \
                     --set image.tag=${IMAGE_TAG}
                 '''
