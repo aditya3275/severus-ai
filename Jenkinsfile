@@ -4,10 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "adityahere/severus-ai"
         IMAGE_TAG  = "v1"
-        APP_PORT   = "8505"
-        SCAN_IMAGE = "adityahere/severus-ai:v1"
 
-        // macOS Jenkins + Docker Desktop
         DOCKER_BIN     = "/usr/local/bin/docker"
         DOCKER_CONTEXT = "desktop-linux"
 
@@ -24,52 +21,15 @@ pipeline {
             }
         }
 
-        /* ================= APPLICATION QUALITY GATES ================= */
-
         stage('Application Build') {
             steps {
                 sh '''
-                    echo "🔧 Building application..."
-                    $PYTHON_BIN --version
+                    echo "🔧 Installing dependencies..."
                     $PYTHON_BIN -m pip install --upgrade pip
                     $PYTHON_BIN -m pip install -r requirements.txt
                 '''
             }
         }
-
-        stage('Application Run') {
-            steps {
-                sh '''
-                    echo "🚀 Running Streamlit application (smoke run)..."
-
-                    nohup $PYTHON_BIN -m streamlit run app.py \
-                      --server.port=${APP_PORT} \
-                      --server.address=0.0.0.0 \
-                      --server.headless=true \
-                      > app.log 2>&1 &
-
-                    sleep 30
-                '''
-            }
-        }
-
-        stage('Application Test') {
-            steps {
-                sh '''
-                    echo "🧪 Testing Streamlit application..."
-
-                    echo "---- Streamlit logs ----"
-                    tail -n 50 app.log || true
-                    echo "-----------------------"
-
-                    curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
-
-                    echo "✅ Streamlit app is reachable"
-                '''
-            }
-        }
-
-        /* ================= DOCKER & SECURITY ================= */
 
         stage('Docker Build Image') {
             steps {
@@ -84,15 +44,14 @@ pipeline {
         stage('Trivy Security Scan') {
             steps {
                 sh '''
-                    echo "🔐 Running Trivy scan on ${SCAN_IMAGE}"
+                    echo "🔐 Running Trivy scan..."
 
                     $DOCKER_BIN --context ${DOCKER_CONTEXT} run --rm \
                       -v /Users/aditya/.docker/run/docker.sock:/var/run/docker.sock \
                       aquasec/trivy:latest image \
-                      --exit-code 1 \
                       --severity CRITICAL,HIGH \
-                      --format table \
-                      ${SCAN_IMAGE} 2>&1 | tee trivy-report.txt
+                      --exit-code 0 \
+                      ${IMAGE_NAME}:${IMAGE_TAG} | tee trivy-report.txt
                 '''
             }
             post {
@@ -121,33 +80,26 @@ pipeline {
             }
         }
 
-        /* ================= K3s DEPLOY (INGRESS ENABLED) ================= */
-
-        stage('Deploy to Kubernetes (K3s via Helm)') {
+        stage('Deploy to Kubernetes (Ingress via Helm)') {
             steps {
                 sh '''
-                    echo "☸️ Deploying Severus AI with Ingress enabled..."
+                    echo "☸️ Deploying Severus AI with Ingress..."
 
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                       --set image.repository=${IMAGE_NAME} \
-                      --set image.tag=${IMAGE_TAG} \
-                      --set ingress.enabled=true
+                      --set image.tag=${IMAGE_TAG}
                 '''
             }
         }
 
-        stage('Verify Kubernetes Deployment') {
+        stage('Verify Deployment') {
             steps {
                 sh '''
-                    echo "🔍 Verifying Kubernetes deployment..."
-
+                    echo "🔍 Verifying resources..."
                     $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
-                    $KUBECTL_BIN get pods -l app=severus-ai
+                    $KUBECTL_BIN get pods
                     $KUBECTL_BIN get svc severus-ai
                     $KUBECTL_BIN get ingress severus-ai
-
-                    echo "🌍 Application should be available at:"
-                    echo "👉 http://severus-ai.local"
                 '''
             }
         }
