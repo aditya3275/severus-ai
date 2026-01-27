@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "adityahere/severus-ai"
         IMAGE_TAG  = "v1"
-        APP_PORT   = "8501"
+        APP_PORT   = "8505"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
 
         // macOS Jenkins + Docker Desktop (CORRECT WAY)
@@ -42,8 +42,7 @@ pipeline {
                 sh '''
                     echo "🚀 Running Streamlit application (smoke run)..."
 
-                    echo "🔪 Cleaning any process using port ${APP_PORT}"
-                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+                    
 
                     nohup $PYTHON_BIN -m streamlit run app.py \
                       --server.port=${APP_PORT} \
@@ -163,5 +162,5 @@ pipeline {
         }
     }
 
-   
+
 }
