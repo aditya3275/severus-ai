@@ -69,8 +69,7 @@ pipeline {
 
                     echo "✅ Streamlit app is reachable"
 
-                    echo "🧹 Stopping Streamlit after test"
-                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+                
                 '''
             }
         }
@@ -164,12 +163,5 @@ pipeline {
         }
     }
 
-    post {
-        always {
-            sh '''
-                echo "🧹 Final cleanup (safety net)"
-                lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
-            '''
-        }
-    }
+   
 }
