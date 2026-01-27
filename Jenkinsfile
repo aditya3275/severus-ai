@@ -52,11 +52,7 @@ pipeline {
         stage('Docker run'){
             steps{
                 sh '''
-                /usr/local/bin/docker run -d \           
-                -p 8501:8501 \
-                -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
-                --name severus-ai \
-                adityahere/severus-ai:latest
+                /usr/local/bin/docker run -d -p 8501:8501 -e OLLAMA_BASE_URL=http://host.docker.internal:11434 --name severus-ai adityahere/severus-ai:v1
                 '''
             }
         }
