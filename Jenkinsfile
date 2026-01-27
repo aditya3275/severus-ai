@@ -84,7 +84,7 @@ pipeline {
                         --exit-code 1 \
                         --severity CRITICAL,HIGH \
                         --format table \
-                        ${SCAN_IMAGE} | tee trivy-report.txt
+                        ${SCAN_IMAGE} 2>&1 | tee trivy-report.txt
                     """
                 }
             }
