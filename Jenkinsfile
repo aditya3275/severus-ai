@@ -7,9 +7,10 @@ pipeline {
         APP_PORT   = "8501"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
 
-        // macOS Jenkins + Docker Desktop
-        DOCKER_BIN  = "/usr/local/bin/docker"
-        DOCKER_HOST = "unix:///Users/aditya/.docker/run/docker.sock"
+        // macOS Jenkins + Docker Desktop (MANDATORY)
+        DOCKER_BIN     = "/usr/local/bin/docker"
+        DOCKER_HOST    = "unix:///Users/aditya/.docker/run/docker.sock"
+        DOCKER_CONTEXT = "desktop-linux"
 
         PYTHON_BIN  = "/usr/bin/python3"
         HELM_BIN    = "/opt/homebrew/bin/helm"
@@ -46,10 +47,10 @@ pipeline {
                     lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
 
                     nohup $PYTHON_BIN -m streamlit run app.py \
-                        --server.port=${APP_PORT} \
-                        --server.address=0.0.0.0 \
-                        --server.headless=true \
-                        > app.log 2>&1 &
+                      --server.port=${APP_PORT} \
+                      --server.address=0.0.0.0 \
+                      --server.headless=true \
+                      > app.log 2>&1 &
 
                     sleep 30
                 '''
@@ -61,15 +62,12 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
-                    echo "---- Streamlit logs ----"
                     tail -n 50 app.log || true
-                    echo "-----------------------"
 
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
                     echo "✅ Streamlit app is reachable"
 
-                    echo "🧹 Stopping Streamlit after test"
                     lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
                 '''
             }
@@ -81,6 +79,7 @@ pipeline {
             steps {
                 sh '''
                     export DOCKER_HOST=${DOCKER_HOST}
+                    $DOCKER_BIN context use ${DOCKER_CONTEXT}
 
                     echo "🔍 Docker sanity check"
                     $DOCKER_BIN version
@@ -93,6 +92,7 @@ pipeline {
             steps {
                 sh '''
                     export DOCKER_HOST=${DOCKER_HOST}
+                    $DOCKER_BIN context use ${DOCKER_CONTEXT}
 
                     echo "🐳 Building Docker image..."
                     $DOCKER_BIN build -t ${IMAGE_NAME}:${IMAGE_TAG} .
@@ -104,6 +104,7 @@ pipeline {
             steps {
                 sh '''
                     export DOCKER_HOST=${DOCKER_HOST}
+                    $DOCKER_BIN context use ${DOCKER_CONTEXT}
 
                     echo "🔐 Running Trivy scan on ${SCAN_IMAGE}"
 
@@ -132,6 +133,7 @@ pipeline {
                 )]) {
                     sh '''
                         export DOCKER_HOST=${DOCKER_HOST}
+                        $DOCKER_BIN context use ${DOCKER_CONTEXT}
 
                         echo "$DOCKER_PASS" | $DOCKER_BIN login -u "$DOCKER_USER" --password-stdin
                         $DOCKER_BIN push ${IMAGE_NAME}:${IMAGE_TAG}
@@ -161,7 +163,6 @@ pipeline {
 
                     $KUBECTL_BIN get pods -l app=severus-ai
                     $KUBECTL_BIN get svc severus-ai
-
                     $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                 '''
             }
