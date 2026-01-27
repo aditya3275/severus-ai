@@ -7,7 +7,7 @@ pipeline {
         APP_PORT   = "8505"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
 
-        // macOS Jenkins + Docker Desktop (CORRECT WAY)
+        // macOS Jenkins + Docker Desktop
         DOCKER_BIN     = "/usr/local/bin/docker"
         DOCKER_CONTEXT = "desktop-linux"
 
@@ -42,8 +42,6 @@ pipeline {
                 sh '''
                     echo "🚀 Running Streamlit application (smoke run)..."
 
-                    
-
                     nohup $PYTHON_BIN -m streamlit run app.py \
                       --server.port=${APP_PORT} \
                       --server.address=0.0.0.0 \
@@ -67,23 +65,11 @@ pipeline {
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
                     echo "✅ Streamlit app is reachable"
-
-                
                 '''
             }
         }
 
         /* ================= DOCKER & SECURITY ================= */
-
-        // stage('Docker Sanity Check') {
-        //     steps {
-        //         sh '''
-        //             echo "🔍 Docker sanity check"
-        //             $DOCKER_BIN --context ${DOCKER_CONTEXT} version
-        //             $DOCKER_BIN --context ${DOCKER_CONTEXT} info
-        //         '''
-        //     }
-        // }
 
         stage('Docker Build Image') {
             steps {
@@ -135,16 +121,17 @@ pipeline {
             }
         }
 
-        /* ================= K3s DEPLOY ================= */
+        /* ================= K3s DEPLOY (INGRESS ENABLED) ================= */
 
         stage('Deploy to Kubernetes (K3s via Helm)') {
             steps {
                 sh '''
-                    echo "☸️ Deploying Severus AI to K3s using Helm..."
+                    echo "☸️ Deploying Severus AI with Ingress enabled..."
 
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                       --set image.repository=${IMAGE_NAME} \
-                      --set image.tag=${IMAGE_TAG}
+                      --set image.tag=${IMAGE_TAG} \
+                      --set ingress.enabled=true
                 '''
             }
         }
@@ -152,15 +139,17 @@ pipeline {
         stage('Verify Kubernetes Deployment') {
             steps {
                 sh '''
-                    echo "🔍 Verifying Kubernetes deployment on K3s..."
+                    echo "🔍 Verifying Kubernetes deployment..."
 
+                    $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                     $KUBECTL_BIN get pods -l app=severus-ai
                     $KUBECTL_BIN get svc severus-ai
-                    $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
+                    $KUBECTL_BIN get ingress severus-ai
+
+                    echo "🌍 Application should be available at:"
+                    echo "👉 http://severus-ai.local"
                 '''
             }
         }
     }
-
-
 }
