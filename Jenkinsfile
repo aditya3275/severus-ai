@@ -43,7 +43,7 @@ pipeline {
                     echo "🚀 Running Streamlit application (smoke run)..."
 
                     echo "🔪 Cleaning any process using port ${APP_PORT}"
-                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+                    // lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
 
                     nohup $PYTHON_BIN -m streamlit run app.py \
                       --server.port=${APP_PORT} \
@@ -70,7 +70,7 @@ pipeline {
                     echo "✅ Streamlit app is reachable"
 
                     echo "🧹 Stopping Streamlit after test"
-                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+                    // lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
                 '''
             }
         }
@@ -168,7 +168,7 @@ pipeline {
         always {
             sh '''
                 echo "🧹 Final cleanup (safety net)"
-                lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+                // lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
             '''
         }
     }
