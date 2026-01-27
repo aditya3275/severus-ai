@@ -33,13 +33,13 @@ pipeline {
                 sh '''
                     echo "🚀 Running Streamlit application (smoke run)..."
 
-                    nohup streamlit run app.py \
+                    nohup python3 -m streamlit run app.py \
                         --server.port=${APP_PORT} \
                         --server.address=0.0.0.0 \
                         --server.headless=true \
                         > app.log 2>&1 &
 
-                    sleep 25
+                    sleep 30
                 '''
             }
         }
@@ -53,13 +53,13 @@ pipeline {
                     tail -n 50 app.log || true
                     echo "---------------------------------------"
 
-                    # Real health check (retry-based)
+                    # Real health check
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
                     echo "✅ Streamlit app is reachable"
 
                     # Cleanup
-                    pkill -f "streamlit run app.py" || true
+                    pkill -f "python3 -m streamlit run app.py" || true
                 '''
             }
         }
