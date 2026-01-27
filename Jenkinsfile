@@ -7,9 +7,11 @@ pipeline {
         APP_PORT   = "8501"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
 
-        // FIX for macOS Jenkins PATH issues
-        DOCKER_BIN = "/usr/local/bin/docker"
-        PYTHON_BIN = "/usr/bin/python3"
+        // Absolute paths (macOS Jenkins safe)
+        DOCKER_BIN  = "/usr/local/bin/docker"
+        PYTHON_BIN  = "/usr/bin/python3"
+        HELM_BIN    = "/opt/homebrew/bin/helm"
+        KUBECTL_BIN = "/opt/homebrew/bin/kubectl"
     }
 
     stages {
@@ -54,9 +56,7 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
-                    echo "---- Streamlit logs ----"
                     tail -n 50 app.log || true
-                    echo "-----------------------"
 
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
@@ -116,24 +116,29 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        /* ================= K3s DEPLOY ================= */
+
+        stage('Deploy to Kubernetes (K3s via Helm)') {
             steps {
                 sh '''
-                    echo "☸️ Deploying Severus AI to Kubernetes using Helm..."
+                    echo "☸️ Deploying Severus AI to K3s using Helm..."
 
-                    /opt/homebrew/bin/helm upgrade --install severus-ai helm/severus-ai \
-                    --set image.repository=adityahere/severus-ai \
-                    --set image.tag=${IMAGE_TAG}
+                    $HELM_BIN upgrade --install severus-ai helm/severus-ai \
+                      --set image.repository=${IMAGE_NAME} \
+                      --set image.tag=${IMAGE_TAG}
                 '''
             }
         }
 
-        stage('Deploy kubernetes service') {
+        stage('Verify Kubernetes Deployment') {
             steps {
                 sh '''
-                    echo "☸️ Deploying Severus AI Kubernetes service..."
+                    echo "🔍 Verifying Kubernetes deployment on K3s..."
 
-                    /opt/homebrew/bin/minikube service severus-ai  
+                    $KUBECTL_BIN get pods -l app=severus-ai
+                    $KUBECTL_BIN get svc severus-ai
+
+                    $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                 '''
             }
         }
