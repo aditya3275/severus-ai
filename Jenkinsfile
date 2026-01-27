@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "adityahere/severus-ai"
         IMAGE_TAG  = "v1"
-        APP_PORT   = "8503"
+        APP_PORT   = "8501"
     }
 
     stages {
@@ -32,12 +32,13 @@ pipeline {
             steps {
                 sh '''
                     echo "🚀 Running Streamlit application (smoke run)..."
+
                     nohup streamlit run app.py \
                         --server.port=${APP_PORT} \
                         --server.headless=true \
                         > app.log 2>&1 &
-                    echo $! > app.pid
-                    sleep 15
+
+                    sleep 20
                 '''
             }
         }
@@ -47,16 +48,13 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
-                    # Check process exists
-                    ps -p $(cat app.pid)
-
-                    # Check app is responding
-                    curl -f http://localhost:${APP_PORT} || exit 1
+                    # Check app is responding (REAL validation)
+                    curl --fail --retry 5 --retry-delay 3 http://localhost:${APP_PORT}
 
                     echo "✅ Streamlit app is healthy"
 
-                    # Cleanup
-                    kill $(cat app.pid)
+                    # Kill Streamlit cleanly
+                    pkill -f "streamlit run app.py" || true
                 '''
             }
         }
