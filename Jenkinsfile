@@ -60,7 +60,7 @@ pipeline {
 
                 # Run new container
                 /usr/local/bin/docker run -d \
-                    -p 8501:8501 \
+                    -p 8501:8503 \
                     -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
                     --name severus-ai \
                     adityahere/severus-ai:v1
