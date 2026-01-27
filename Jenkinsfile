@@ -5,6 +5,7 @@ pipeline {
         IMAGE_NAME = "adityahere/severus-ai"
         IMAGE_TAG  = "v1"
         APP_PORT   = "8501"
+        SCAN_IMAGE = "adityahere/severus-ai:v1"
     }
 
     stages {
@@ -49,22 +50,18 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
-                    echo "---- Streamlit logs (last 50 lines) ----"
-                    tail -n 50 app.log || true
-                    echo "---------------------------------------"
+                    tail -n 30 app.log || true
 
-                    # Real health check
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
                     echo "✅ Streamlit app is reachable"
 
-                    # Cleanup
                     pkill -f "python3 -m streamlit run app.py" || true
                 '''
             }
         }
 
-        /* ================= DOCKER STAGES ================= */
+        /* ================= DOCKER & SECURITY ================= */
 
         stage('Docker Build Image') {
             steps {
@@ -72,6 +69,29 @@ pipeline {
                     echo "🐳 Building Docker image..."
                     /usr/local/bin/docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
+            }
+        }
+
+        stage('Trivy Security Scan') {
+            steps {
+                script {
+                    echo "🔐 Running Trivy scan on ${SCAN_IMAGE}"
+
+                    sh """
+                        docker run --rm \
+                        -v /var/run/docker.sock:/var/run/docker.sock \
+                        aquasec/trivy:latest image \
+                        --exit-code 1 \
+                        --severity CRITICAL,HIGH \
+                        --format table \
+                        ${SCAN_IMAGE} | tee trivy-report.txt
+                    """
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'trivy-report.txt', fingerprint: true
+                }
             }
         }
 
