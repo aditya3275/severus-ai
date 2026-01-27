@@ -49,10 +49,21 @@ pipeline {
                 }
             }
         }
-        stage('Docker run'){
-            steps{
+        stage('Docker Run') {
+            steps {
                 sh '''
-                /usr/local/bin/docker run -d -p 8501:8501 -e OLLAMA_BASE_URL=http://host.docker.internal:11434 --name severus-ai adityahere/severus-ai:v1
+                # Stop container if running
+                /usr/local/bin/docker ps -q --filter "name=severus-ai" | xargs -r /usr/local/bin/docker stop
+
+                # Remove container if exists
+                /usr/local/bin/docker ps -aq --filter "name=severus-ai" | xargs -r /usr/local/bin/docker rm
+
+                # Run new container
+                /usr/local/bin/docker run -d \
+                    -p 8501:8501 \
+                    -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+                    --name severus-ai \
+                    adityahere/severus-ai:v1
                 '''
             }
         }
