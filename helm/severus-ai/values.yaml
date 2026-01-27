@@ -1,0 +1,16 @@
+replicaCount: 1
+
+image:
+  repository: adityahere/severus-ai
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 8501
+  nodePort: 30007
+
+env:
+  OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+
+resources: {}

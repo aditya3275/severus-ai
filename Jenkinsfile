@@ -116,19 +116,14 @@ pipeline {
             }
         }
 
-        stage('Docker Run') {
+        stage('Deploy to Kubernetes (Helm)') {
             steps {
                 sh '''
-                    echo "🧹 Cleaning old container..."
-                    $DOCKER_BIN ps -q --filter "name=severus-ai" | xargs -r $DOCKER_BIN stop
-                    $DOCKER_BIN ps -aq --filter "name=severus-ai" | xargs -r $DOCKER_BIN rm
+                    echo "☸️ Deploying Severus AI to Kubernetes using Helm..."
 
-                    echo "🚀 Running new container..."
-                    $DOCKER_BIN run -d \
-                        -p 8503:8501 \
-                        -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
-                        --name severus-ai \
-                        ${IMAGE_NAME}:${IMAGE_TAG}
+                    helm upgrade --install severus-ai helm/severus-ai \
+                    --set image.repository=adityahere/severus-ai \
+                    --set image.tag=${IMAGE_TAG}
                 '''
             }
         }
