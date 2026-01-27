@@ -7,7 +7,7 @@ pipeline {
         APP_PORT   = "8501"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
 
-        // macOS Jenkins fixes
+        // macOS Jenkins + Docker Desktop
         DOCKER_BIN  = "/usr/local/bin/docker"
         DOCKER_HOST = "unix:///Users/aditya/.docker/run/docker.sock"
 
@@ -15,7 +15,6 @@ pipeline {
         HELM_BIN    = "/opt/homebrew/bin/helm"
         KUBECTL_BIN = "/opt/homebrew/bin/kubectl"
     }
-
 
     stages {
 
@@ -78,9 +77,23 @@ pipeline {
 
         /* ================= DOCKER & SECURITY ================= */
 
+        stage('Docker Sanity Check') {
+            steps {
+                sh '''
+                    export DOCKER_HOST=${DOCKER_HOST}
+
+                    echo "🔍 Docker sanity check"
+                    $DOCKER_BIN version
+                    $DOCKER_BIN info
+                '''
+            }
+        }
+
         stage('Docker Build Image') {
             steps {
                 sh '''
+                    export DOCKER_HOST=${DOCKER_HOST}
+
                     echo "🐳 Building Docker image..."
                     $DOCKER_BIN build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
@@ -89,17 +102,19 @@ pipeline {
 
         stage('Trivy Security Scan') {
             steps {
-                sh """
+                sh '''
+                    export DOCKER_HOST=${DOCKER_HOST}
+
                     echo "🔐 Running Trivy scan on ${SCAN_IMAGE}"
 
                     $DOCKER_BIN run --rm \
-                    -v /var/run/docker.sock:/var/run/docker.sock \
-                    aquasec/trivy:latest image \
-                    --exit-code 1 \
-                    --severity CRITICAL,HIGH \
-                    --format table \
-                    ${SCAN_IMAGE} 2>&1 | tee trivy-report.txt
-                """
+                      -v /Users/aditya/.docker/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy:latest image \
+                      --exit-code 1 \
+                      --severity CRITICAL,HIGH \
+                      --format table \
+                      ${SCAN_IMAGE} 2>&1 | tee trivy-report.txt
+                '''
             }
             post {
                 always {
@@ -116,6 +131,8 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
+                        export DOCKER_HOST=${DOCKER_HOST}
+
                         echo "$DOCKER_PASS" | $DOCKER_BIN login -u "$DOCKER_USER" --password-stdin
                         $DOCKER_BIN push ${IMAGE_NAME}:${IMAGE_TAG}
                     '''
