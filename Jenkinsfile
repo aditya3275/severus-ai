@@ -6,6 +6,10 @@ pipeline {
         IMAGE_TAG  = "v1"
         APP_PORT   = "8501"
         SCAN_IMAGE = "adityahere/severus-ai:v1"
+
+        // FIX for macOS Jenkins PATH issues
+        DOCKER_BIN = "/usr/local/bin/docker"
+        PYTHON_BIN = "/usr/bin/python3"
     }
 
     stages {
@@ -22,9 +26,9 @@ pipeline {
             steps {
                 sh '''
                     echo "🔧 Building application..."
-                    python3 --version
-                    python3 -m pip install --upgrade pip
-                    python3 -m pip install -r requirements.txt
+                    $PYTHON_BIN --version
+                    $PYTHON_BIN -m pip install --upgrade pip
+                    $PYTHON_BIN -m pip install -r requirements.txt
                 '''
             }
         }
@@ -34,7 +38,7 @@ pipeline {
                 sh '''
                     echo "🚀 Running Streamlit application (smoke run)..."
 
-                    nohup python3 -m streamlit run app.py \
+                    nohup $PYTHON_BIN -m streamlit run app.py \
                         --server.port=${APP_PORT} \
                         --server.address=0.0.0.0 \
                         --server.headless=true \
@@ -50,7 +54,9 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
-                    tail -n 30 app.log || true
+                    echo "---- Streamlit logs ----"
+                    tail -n 50 app.log || true
+                    echo "-----------------------"
 
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
@@ -67,7 +73,7 @@ pipeline {
             steps {
                 sh '''
                     echo "🐳 Building Docker image..."
-                    /usr/local/bin/docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    $DOCKER_BIN build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
             }
         }
@@ -78,7 +84,7 @@ pipeline {
                     echo "🔐 Running Trivy scan on ${SCAN_IMAGE}"
 
                     sh """
-                        docker run --rm \
+                        $DOCKER_BIN run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         aquasec/trivy:latest image \
                         --exit-code 1 \
@@ -103,8 +109,8 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        echo "$DOCKER_PASS" | /usr/local/bin/docker login -u "$DOCKER_USER" --password-stdin
-                        /usr/local/bin/docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        echo "$DOCKER_PASS" | $DOCKER_BIN login -u "$DOCKER_USER" --password-stdin
+                        $DOCKER_BIN push ${IMAGE_NAME}:${IMAGE_TAG}
                     '''
                 }
             }
@@ -114,11 +120,11 @@ pipeline {
             steps {
                 sh '''
                     echo "🧹 Cleaning old container..."
-                    /usr/local/bin/docker ps -q --filter "name=severus-ai" | xargs -r /usr/local/bin/docker stop
-                    /usr/local/bin/docker ps -aq --filter "name=severus-ai" | xargs -r /usr/local/bin/docker rm
+                    $DOCKER_BIN ps -q --filter "name=severus-ai" | xargs -r $DOCKER_BIN stop
+                    $DOCKER_BIN ps -aq --filter "name=severus-ai" | xargs -r $DOCKER_BIN rm
 
                     echo "🚀 Running new container..."
-                    /usr/local/bin/docker run -d \
+                    $DOCKER_BIN run -d \
                         -p 8503:8501 \
                         -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
                         --name severus-ai \
