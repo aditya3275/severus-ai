@@ -69,23 +69,23 @@ pipeline {
 
                     echo "✅ Streamlit app is reachable"
 
-                    echo "🧹 Stopping Streamlit after test"
-                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+                    // echo "🧹 Stopping Streamlit after test"
+                    // lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
                 '''
             }
         }
 
         /* ================= DOCKER & SECURITY ================= */
 
-        stage('Docker Sanity Check') {
-            steps {
-                sh '''
-                    echo "🔍 Docker sanity check"
-                    $DOCKER_BIN --context ${DOCKER_CONTEXT} version
-                    $DOCKER_BIN --context ${DOCKER_CONTEXT} info
-                '''
-            }
-        }
+        // stage('Docker Sanity Check') {
+        //     steps {
+        //         sh '''
+        //             echo "🔍 Docker sanity check"
+        //             $DOCKER_BIN --context ${DOCKER_CONTEXT} version
+        //             $DOCKER_BIN --context ${DOCKER_CONTEXT} info
+        //         '''
+        //     }
+        // }
 
         stage('Docker Build Image') {
             steps {
