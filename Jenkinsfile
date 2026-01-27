@@ -116,7 +116,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes (Helm)') {
+        stage('Deploy to Kubernetes') {
             steps {
                 sh '''
                     echo "☸️ Deploying Severus AI to Kubernetes using Helm..."
@@ -124,6 +124,16 @@ pipeline {
                     /opt/homebrew/bin/helm upgrade --install severus-ai helm/severus-ai \
                     --set image.repository=adityahere/severus-ai \
                     --set image.tag=${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Deploy kubernetes service') {
+            steps {
+                sh '''
+                    echo "☸️ Deploying Severus AI Kubernetes service..."
+
+                    /opt/homebrew/bin/minikube service severus-ai  
                 '''
             }
         }
