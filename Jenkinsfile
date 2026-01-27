@@ -40,6 +40,9 @@ pipeline {
                 sh '''
                     echo "🚀 Running Streamlit application (smoke run)..."
 
+                    echo "🔪 Cleaning any process using port ${APP_PORT}"
+                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+
                     nohup $PYTHON_BIN -m streamlit run app.py \
                         --server.port=${APP_PORT} \
                         --server.address=0.0.0.0 \
@@ -56,13 +59,16 @@ pipeline {
                 sh '''
                     echo "🧪 Testing Streamlit application..."
 
+                    echo "---- Streamlit logs ----"
                     tail -n 50 app.log || true
+                    echo "-----------------------"
 
                     curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:${APP_PORT}
 
                     echo "✅ Streamlit app is reachable"
 
-                    pkill -f "python3 -m streamlit run app.py" || true
+                    echo "🧹 Stopping Streamlit after test"
+                    lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
                 '''
             }
         }
@@ -80,19 +86,17 @@ pipeline {
 
         stage('Trivy Security Scan') {
             steps {
-                script {
+                sh """
                     echo "🔐 Running Trivy scan on ${SCAN_IMAGE}"
 
-                    sh """
-                        $DOCKER_BIN run --rm \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        aquasec/trivy:latest image \
-                        --exit-code 1 \
-                        --severity CRITICAL,HIGH \
-                        --format table \
-                        ${SCAN_IMAGE} 2>&1 | tee trivy-report.txt
-                    """
-                }
+                    $DOCKER_BIN run --rm \
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    aquasec/trivy:latest image \
+                    --exit-code 1 \
+                    --severity CRITICAL,HIGH \
+                    --format table \
+                    ${SCAN_IMAGE} 2>&1 | tee trivy-report.txt
+                """
             }
             post {
                 always {
@@ -141,6 +145,15 @@ pipeline {
                     $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                 '''
             }
+        }
+    }
+
+    post {
+        always {
+            sh '''
+                echo "🧹 Final cleanup (safety net)"
+                lsof -ti tcp:${APP_PORT} | xargs -r kill -9 || true
+            '''
         }
     }
 }
