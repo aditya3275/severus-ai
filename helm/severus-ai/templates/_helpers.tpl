@@ -1,7 +1,11 @@
 {{- define "severus-ai.name" -}}
 severus-ai
-{{- end -}}
+{{- end }}
 
 {{- define "severus-ai.fullname" -}}
-{{ include "severus-ai.name" . }}
-{{- end -}}
+severus-ai
+{{- end }}
+
+{{- define "severus-ai.labels" -}}
+app: severus-ai
+{{- end }}

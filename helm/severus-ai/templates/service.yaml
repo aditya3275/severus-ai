@@ -5,8 +5,7 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   selector:
-    app: {{ include "severus-ai.name" . }}
+    app: severus-ai
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
-      nodePort: {{ .Values.service.nodePort }}
+      targetPort: 8501

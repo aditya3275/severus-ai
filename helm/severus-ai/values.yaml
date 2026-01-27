@@ -6,11 +6,14 @@ image:
   pullPolicy: IfNotPresent
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 8501
-  nodePort: 30007
 
-env:
-  OLLAMA_BASE_URL: "http://host.docker.internal:11434"
-
-resources: {}
+ingress:
+  enabled: true
+  className: traefik
+  hosts:
+    - host: severus-ai.local
+      paths:
+        - path: /
+          pathType: Prefix
