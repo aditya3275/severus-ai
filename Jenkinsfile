@@ -162,17 +162,18 @@ pipeline {
                             POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
                             echo "Using pod: $POD"
 
-                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- sh -c 'echo $OLLAMA_BASE_URL')
+                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- printenv OLLAMA_BASE_URL)
 
                             if [ -z "$OLLAMA_URL" ]; then
-                              echo "❌ OLLAMA_BASE_URL is NOT set"
+                              echo "❌ OLLAMA_BASE_URL is NOT set inside pod"
                               exit 1
                             fi
 
                             echo "OLLAMA_BASE_URL=$OLLAMA_URL"
+
                             $KUBECTL_BIN exec $POD -- curl --fail ${OLLAMA_URL}/api/tags
 
-                            echo "✅ Ollama reachable"
+                            echo "✅ Ollama reachable from pod"
                         '''
                     }
                 }
@@ -198,35 +199,35 @@ pipeline {
                     }
                 }
 
-                /* 🆕 NEW STAGE */
                 stage('K3s Version Validation') {
                     steps {
                         sh '''
-                            echo "🧪 Validating Helm chart against multiple K3s versions..."
+                            echo "🧪 Validating Helm chart across K3s versions..."
 
                             mkdir -p k3s-validation-logs
 
-                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35; do
+                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35 v1.36; do
                               echo "▶ Testing against K3s $VERSION"
 
                               {
                                 echo "====================================="
-                                echo "K3s Version Target: $VERSION"
+                                echo "Target K3s Version: $VERSION"
                                 echo "Timestamp: $(date)"
                                 echo "-------------------------------------"
+
                                 $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                                   --dry-run --debug \
                                   --set image.repository=${IMAGE_NAME} \
                                   --set image.tag=${IMAGE_TAG} \
                                   --set global.k3sVersion=$VERSION
+
                                 echo "-------------------------------------"
                                 $KUBECTL_BIN version
                                 echo "====================================="
-                              } > k3s-validation-logs/k3s-$VERSION.log
-
+                              } > k3s-validation-logs/k3s-${VERSION}.log
                             done
 
-                            echo "✅ K3s version validation completed"
+                            echo "✅ K3s compatibility validation complete"
                         '''
                     }
                     post {
