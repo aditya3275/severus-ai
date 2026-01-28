@@ -17,3 +17,6 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+
+env:
+  OLLAMA_BASE_URL: "http://host.k3d.internal:11434"

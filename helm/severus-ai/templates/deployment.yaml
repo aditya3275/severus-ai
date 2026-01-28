@@ -18,5 +18,12 @@ spec:
         - name: severus-ai
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
-            - containerPort: 8501
+            - containerPort: {{ .Values.service.port }}
+
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
