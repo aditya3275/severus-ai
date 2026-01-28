@@ -5,6 +5,8 @@ pipeline {
         IMAGE_NAME = "adityahere/severus-ai"
         IMAGE_TAG  = "v1"
 
+        APP_PORT = "8505"
+
         DOCKER_BIN     = "/usr/local/bin/docker"
         DOCKER_CONTEXT = "desktop-linux"
 
@@ -21,6 +23,8 @@ pipeline {
             }
         }
 
+        /* ================= BUILD ================= */
+
         stage('Application Build') {
             steps {
                 sh '''
@@ -31,6 +35,43 @@ pipeline {
             }
         }
 
+        /* ================= RUN (SMOKE START) ================= */
+
+        stage('Run (Smoke Start)') {
+            steps {
+                sh '''
+                    echo "🚀 Starting application for smoke test..."
+
+                    nohup $PYTHON_BIN -m streamlit run app.py \
+                      --server.port=${APP_PORT} \
+                      --server.headless=true \
+                      > app.log 2>&1 &
+
+                    sleep 20
+                '''
+            }
+        }
+
+        /* ================= TEST ================= */
+
+        stage('Test (Smoke Test)') {
+            steps {
+                sh '''
+                    echo "🧪 Running smoke test..."
+
+                    echo "---- App logs ----"
+                    tail -n 30 app.log || true
+                    echo "------------------"
+
+                    curl --fail http://127.0.0.1:${APP_PORT}
+
+                    echo "✅ Smoke test passed"
+                '''
+            }
+        }
+
+        /* ================= DOCKER ================= */
+
         stage('Docker Build Image') {
             steps {
                 sh '''
@@ -40,6 +81,8 @@ pipeline {
                 '''
             }
         }
+
+        /* ================= SECURITY ================= */
 
         stage('Trivy Security Scan') {
             steps {
@@ -61,6 +104,8 @@ pipeline {
             }
         }
 
+        /* ================= PUSH ================= */
+
         stage('Docker Push Image') {
             steps {
                 withCredentials([usernamePassword(
@@ -80,6 +125,8 @@ pipeline {
             }
         }
 
+        /* ================= DEPLOY ================= */
+
         stage('Deploy to Kubernetes (Ingress via Helm)') {
             steps {
                 sh '''
@@ -95,7 +142,8 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 sh '''
-                    echo "🔍 Verifying resources..."
+                    echo "🔍 Verifying Kubernetes resources..."
+
                     $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                     $KUBECTL_BIN get pods
                     $KUBECTL_BIN get svc severus-ai
