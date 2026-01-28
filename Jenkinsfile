@@ -165,16 +165,14 @@ pipeline {
                             OLLAMA_URL=$($KUBECTL_BIN exec $POD -- sh -c 'echo $OLLAMA_BASE_URL')
 
                             if [ -z "$OLLAMA_URL" ]; then
-                            echo "❌ OLLAMA_BASE_URL is NOT set inside the pod"
-                            exit 1
+                              echo "❌ OLLAMA_BASE_URL is NOT set"
+                              exit 1
                             fi
 
-                            echo "✅ OLLAMA_BASE_URL = $OLLAMA_URL"
+                            echo "OLLAMA_BASE_URL=$OLLAMA_URL"
+                            $KUBECTL_BIN exec $POD -- curl --fail ${OLLAMA_URL}/api/tags
 
-                            $KUBECTL_BIN exec $POD -- \
-                            curl --fail ${OLLAMA_URL}/api/tags
-
-                            echo "✅ Ollama reachable from pod"
+                            echo "✅ Ollama reachable"
                         '''
                     }
                 }
@@ -183,9 +181,9 @@ pipeline {
                     steps {
                         sh '''
                             echo "🩺 Checking Kubernetes health..."
-                            $KUBECTL_BIN get pods -l app=severus-ai
                             $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
-                            echo "✅ Kubernetes resources healthy"
+                            $KUBECTL_BIN get pods -l app=severus-ai
+                            echo "✅ Kubernetes healthy"
                         '''
                     }
                 }
@@ -195,8 +193,46 @@ pipeline {
                         sh '''
                             echo "📜 Checking application logs..."
                             $KUBECTL_BIN logs deployment/severus-ai | tail -n 50
-                            echo "✅ No critical log errors detected"
+                            echo "✅ Logs look sane"
                         '''
+                    }
+                }
+
+                /* 🆕 NEW STAGE */
+                stage('K3s Version Validation') {
+                    steps {
+                        sh '''
+                            echo "🧪 Validating Helm chart against multiple K3s versions..."
+
+                            mkdir -p k3s-validation-logs
+
+                            for VERSION in v1.26 v1.27 v1.28 v1.29; do
+                              echo "▶ Testing against K3s $VERSION"
+
+                              {
+                                echo "====================================="
+                                echo "K3s Version Target: $VERSION"
+                                echo "Timestamp: $(date)"
+                                echo "-------------------------------------"
+                                $HELM_BIN upgrade --install severus-ai helm/severus-ai \
+                                  --dry-run --debug \
+                                  --set image.repository=${IMAGE_NAME} \
+                                  --set image.tag=${IMAGE_TAG} \
+                                  --set global.k3sVersion=$VERSION
+                                echo "-------------------------------------"
+                                $KUBECTL_BIN version
+                                echo "====================================="
+                              } > k3s-validation-logs/k3s-$VERSION.log
+
+                            done
+
+                            echo "✅ K3s version validation completed"
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'k3s-validation-logs/*.log', fingerprint: true
+                        }
                     }
                 }
             }
