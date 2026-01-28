@@ -206,7 +206,7 @@ pipeline {
 
                             mkdir -p k3s-validation-logs
 
-                            for VERSION in v1.26 v1.27 v1.28 v1.29; do
+                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35; do
                               echo "▶ Testing against K3s $VERSION"
 
                               {
