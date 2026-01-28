@@ -160,10 +160,16 @@ pipeline {
                             echo "🧠 Testing Ollama connectivity from pod..."
 
                             POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
+                            echo "Using pod: $POD"
 
-                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- printenv OLLAMA_BASE_URL)
+                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- sh -c 'echo $OLLAMA_BASE_URL')
 
-                            echo "Using Ollama URL: $OLLAMA_URL"
+                            if [ -z "$OLLAMA_URL" ]; then
+                            echo "❌ OLLAMA_BASE_URL is NOT set inside the pod"
+                            exit 1
+                            fi
+
+                            echo "✅ OLLAMA_BASE_URL = $OLLAMA_URL"
 
                             $KUBECTL_BIN exec $POD -- \
                             curl --fail ${OLLAMA_URL}/api/tags
