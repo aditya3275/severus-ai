@@ -158,9 +158,16 @@ pipeline {
                     steps {
                         sh '''
                             echo "🧠 Testing Ollama connectivity from pod..."
+
                             POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
+
+                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- printenv OLLAMA_BASE_URL)
+
+                            echo "Using Ollama URL: $OLLAMA_URL"
+
                             $KUBECTL_BIN exec $POD -- \
-                              curl --fail $OLLAMA_BASE_URL/api/tags
+                            curl --fail ${OLLAMA_URL}/api/tags
+
                             echo "✅ Ollama reachable from pod"
                         '''
                     }
