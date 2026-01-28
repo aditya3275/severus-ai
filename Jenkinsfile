@@ -139,16 +139,53 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                    echo "🔍 Verifying Kubernetes resources..."
+        /* ================= POST-DEPLOY PARALLEL TESTS ================= */
 
-                    $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
-                    $KUBECTL_BIN get pods
-                    $KUBECTL_BIN get svc severus-ai
-                    $KUBECTL_BIN get ingress severus-ai
-                '''
+        stage('Post-Deployment Tests') {
+            parallel {
+
+                stage('Ingress Reachability Test') {
+                    steps {
+                        sh '''
+                            echo "🌐 Testing Ingress reachability..."
+                            curl --fail http://severus-ai.local
+                            echo "✅ Ingress reachable"
+                        '''
+                    }
+                }
+
+                stage('Ollama Connectivity Test') {
+                    steps {
+                        sh '''
+                            echo "🧠 Testing Ollama connectivity from pod..."
+                            POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
+                            $KUBECTL_BIN exec $POD -- \
+                              curl --fail $OLLAMA_BASE_URL/api/tags
+                            echo "✅ Ollama reachable from pod"
+                        '''
+                    }
+                }
+
+                stage('Kubernetes Health Test') {
+                    steps {
+                        sh '''
+                            echo "🩺 Checking Kubernetes health..."
+                            $KUBECTL_BIN get pods -l app=severus-ai
+                            $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
+                            echo "✅ Kubernetes resources healthy"
+                        '''
+                    }
+                }
+
+                stage('Log Sanity Test') {
+                    steps {
+                        sh '''
+                            echo "📜 Checking application logs..."
+                            $KUBECTL_BIN logs deployment/severus-ai | tail -n 50
+                            echo "✅ No critical log errors detected"
+                        '''
+                    }
+                }
             }
         }
     }
