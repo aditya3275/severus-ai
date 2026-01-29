@@ -169,7 +169,9 @@ pipeline {
             steps {
                 sh '''
                     echo "☸️ Deploying Severus AI..."
+
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
+                      --force \
                       --set image.repository=${IMAGE_NAME} \
                       --set image.tag=${IMAGE_TAG}
                 '''
