@@ -44,15 +44,12 @@ pipeline {
                     $HELM_BIN repo add grafana https://grafana.github.io/helm-charts || true
                     $HELM_BIN repo update
 
-                    # Loki (Distributed – production style)
-                    $HELM_BIN upgrade --install loki grafana/loki \
+                    # Loki + Promtail (stable bootstrap)
+                    $HELM_BIN upgrade --install loki grafana/loki-stack \
                       --namespace observability \
+                      --set grafana.enabled=false \
+                      --set loki.persistence.enabled=false \
                       --set loki.auth_enabled=false
-
-                    # Promtail
-                    $HELM_BIN upgrade --install promtail grafana/promtail \
-                      --namespace observability \
-                      --set config.clients[0].url=http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
 
                     # Grafana
                     $HELM_BIN upgrade --install grafana grafana/grafana \
