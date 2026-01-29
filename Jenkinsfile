@@ -37,27 +37,22 @@ pipeline {
 
                     echo "🚀 Running Phase A: Observability Bootstrap (ONE TIME)"
 
-                    # Namespace
                     $KUBECTL_BIN create namespace observability || true
 
-                    # Helm repo
                     $HELM_BIN repo add grafana https://grafana.github.io/helm-charts || true
                     $HELM_BIN repo update
 
-                    # Loki + Promtail (stable bootstrap)
                     $HELM_BIN upgrade --install loki grafana/loki-stack \
                       --namespace observability \
                       --set grafana.enabled=false \
                       --set loki.persistence.enabled=false \
                       --set loki.auth_enabled=false
 
-                    # Grafana
                     $HELM_BIN upgrade --install grafana grafana/grafana \
                       --namespace observability \
                       --set adminPassword=admin \
                       --set service.type=ClusterIP
 
-                    # Mark completion
                     $KUBECTL_BIN create configmap observability-bootstrap \
                       -n observability \
                       --from-literal=installed=true
@@ -170,13 +165,11 @@ pipeline {
                 sh '''
                     echo "☸️ Deploying Severus AI..."
 
-                    # Cleanly handle immutable selector changes
                     $KUBECTL_BIN delete deployment severus-ai --ignore-not-found
 
-                    # Deploy via Helm
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
-                    --set image.repository=${IMAGE_NAME} \
-                    --set image.tag=${IMAGE_TAG}
+                      --set image.repository=${IMAGE_NAME} \
+                      --set image.tag=${IMAGE_TAG}
                 '''
             }
         }
@@ -206,6 +199,44 @@ pipeline {
                         sh '''
                             $KUBECTL_BIN logs deployment/severus-ai | tail -n 50
                         '''
+                    }
+                }
+
+                /* ✅ RESTORED EXACTLY WHERE IT BELONGS */
+                stage('K3s Version Validation') {
+                    steps {
+                        sh '''
+                            echo "🧪 Validating Helm chart across K3s versions..."
+                            mkdir -p k3s-validation-logs
+
+                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35 v1.36; do
+                              echo "▶ Testing against K3s $VERSION"
+
+                              {
+                                echo "====================================="
+                                echo "Target K3s Version: $VERSION"
+                                echo "Timestamp: $(date)"
+                                echo "-------------------------------------"
+
+                                $HELM_BIN upgrade --install severus-ai helm/severus-ai \
+                                  --dry-run --debug \
+                                  --set image.repository=${IMAGE_NAME} \
+                                  --set image.tag=${IMAGE_TAG} \
+                                  --set global.k3sVersion=$VERSION
+
+                                echo "-------------------------------------"
+                                $KUBECTL_BIN version
+                                echo "====================================="
+                              } > k3s-validation-logs/k3s-${VERSION}.log
+                            done
+
+                            echo "✅ K3s compatibility validation complete"
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'k3s-validation-logs/*.log', fingerprint: true
+                        }
                     }
                 }
             }
