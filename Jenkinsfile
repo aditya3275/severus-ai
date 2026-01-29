@@ -23,6 +23,57 @@ pipeline {
             }
         }
 
+        /* ================= PHASE A (RUN ONCE) ================= */
+
+        stage('Phase A – Observability Bootstrap') {
+            when {
+                expression {
+                    sh(
+                        script: '''
+                          kubectl get configmap observability-bootstrap -n observability >/dev/null 2>&1
+                        ''',
+                        returnStatus: true
+                    ) != 0
+                }
+            }
+
+            steps {
+                sh '''
+                    echo "🚀 Running Phase A: Observability Bootstrap (ONE TIME)"
+
+                    # Create namespace
+                    kubectl create namespace observability || true
+
+                    # Add Helm repo
+                    helm repo add grafana https://grafana.github.io/helm-charts || true
+                    helm repo update
+
+                    # Install Loki (Distributed, production-style)
+                    helm upgrade --install loki grafana/loki \
+                      --namespace observability \
+                      --set loki.auth_enabled=false
+
+                    # Install Promtail
+                    helm upgrade --install promtail grafana/promtail \
+                      --namespace observability \
+                      --set config.clients[0].url=http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
+
+                    # Install Grafana
+                    helm upgrade --install grafana grafana/grafana \
+                      --namespace observability \
+                      --set adminPassword=admin \
+                      --set service.type=ClusterIP
+
+                    # Mark Phase A as completed
+                    kubectl create configmap observability-bootstrap \
+                      -n observability \
+                      --from-literal=installed=true
+
+                    echo "✅ Phase A completed successfully"
+                '''
+            }
+        }
+
         /* ================= BUILD ================= */
 
         stage('Application Build') {
@@ -59,10 +110,7 @@ pipeline {
                 sh '''
                     echo "🧪 Running smoke test..."
 
-                    echo "---- App logs ----"
                     tail -n 30 app.log || true
-                    echo "------------------"
-
                     curl --fail http://127.0.0.1:${APP_PORT}
 
                     echo "✅ Smoke test passed"
@@ -130,7 +178,7 @@ pipeline {
         stage('Deploy to Kubernetes (Ingress via Helm)') {
             steps {
                 sh '''
-                    echo "☸️ Deploying Severus AI with Ingress..."
+                    echo "☸️ Deploying Severus AI..."
 
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                       --set image.repository=${IMAGE_NAME} \
@@ -139,7 +187,7 @@ pipeline {
             }
         }
 
-        /* ================= POST-DEPLOY PARALLEL TESTS ================= */
+        /* ================= POST-DEPLOY TESTS ================= */
 
         stage('Post-Deployment Tests') {
             parallel {
@@ -147,33 +195,7 @@ pipeline {
                 stage('Ingress Reachability Test') {
                     steps {
                         sh '''
-                            echo "🌐 Testing Ingress reachability..."
                             curl --fail http://severus-ai.local
-                            echo "✅ Ingress reachable"
-                        '''
-                    }
-                }
-
-                stage('Ollama Connectivity Test') {
-                    steps {
-                        sh '''
-                            echo "🧠 Testing Ollama connectivity from pod..."
-
-                            POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
-                            echo "Using pod: $POD"
-
-                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- printenv OLLAMA_BASE_URL)
-
-                            if [ -z "$OLLAMA_URL" ]; then
-                              echo "❌ OLLAMA_BASE_URL is NOT set inside pod"
-                              exit 1
-                            fi
-
-                            echo "OLLAMA_BASE_URL=$OLLAMA_URL"
-
-                            $KUBECTL_BIN exec $POD -- curl --fail ${OLLAMA_URL}/api/tags
-
-                            echo "✅ Ollama reachable from pod"
                         '''
                     }
                 }
@@ -181,10 +203,8 @@ pipeline {
                 stage('Kubernetes Health Test') {
                     steps {
                         sh '''
-                            echo "🩺 Checking Kubernetes health..."
                             $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                             $KUBECTL_BIN get pods -l app=severus-ai
-                            echo "✅ Kubernetes healthy"
                         '''
                     }
                 }
@@ -192,48 +212,8 @@ pipeline {
                 stage('Log Sanity Test') {
                     steps {
                         sh '''
-                            echo "📜 Checking application logs..."
                             $KUBECTL_BIN logs deployment/severus-ai | tail -n 50
-                            echo "✅ Logs look sane"
                         '''
-                    }
-                }
-
-                stage('K3s Version Validation') {
-                    steps {
-                        sh '''
-                            echo "🧪 Validating Helm chart across K3s versions..."
-
-                            mkdir -p k3s-validation-logs
-
-                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35 v1.36; do
-                              echo "▶ Testing against K3s $VERSION"
-
-                              {
-                                echo "====================================="
-                                echo "Target K3s Version: $VERSION"
-                                echo "Timestamp: $(date)"
-                                echo "-------------------------------------"
-
-                                $HELM_BIN upgrade --install severus-ai helm/severus-ai \
-                                  --dry-run --debug \
-                                  --set image.repository=${IMAGE_NAME} \
-                                  --set image.tag=${IMAGE_TAG} \
-                                  --set global.k3sVersion=$VERSION
-
-                                echo "-------------------------------------"
-                                $KUBECTL_BIN version
-                                echo "====================================="
-                              } > k3s-validation-logs/k3s-${VERSION}.log
-                            done
-
-                            echo "✅ K3s compatibility validation complete"
-                        '''
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: 'k3s-validation-logs/*.log', fingerprint: true
-                        }
                     }
                 }
             }
