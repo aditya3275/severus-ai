@@ -4,15 +4,29 @@ metadata:
   name: {{ include "severus-ai.fullname" . }}
   labels:
     {{- include "severus-ai.labels" . | nindent 4 }}
+    app.kubernetes.io/name: severus-ai
+    app.kubernetes.io/part-of: observability-demo
+
 spec:
   replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
       app: severus-ai
+      app.kubernetes.io/name: severus-ai
+
   template:
     metadata:
       labels:
         app: severus-ai
+        app.kubernetes.io/name: severus-ai
+        app.kubernetes.io/part-of: observability-demo
+
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.port }}"
+        prometheus.io/path: "/metrics"
+
     spec:
       containers:
         - name: severus-ai
