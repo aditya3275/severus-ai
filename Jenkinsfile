@@ -26,46 +26,42 @@ pipeline {
         /* ================= PHASE A (RUN ONCE) ================= */
 
         stage('Phase A – Observability Bootstrap') {
-            when {
-                expression {
-                    sh(
-                        script: '''
-                          kubectl get configmap observability-bootstrap -n observability >/dev/null 2>&1
-                        ''',
-                        returnStatus: true
-                    ) != 0
-                }
-            }
-
             steps {
                 sh '''
+                    echo "🔍 Checking if Phase A already ran..."
+
+                    if $KUBECTL_BIN get configmap observability-bootstrap -n observability >/dev/null 2>&1; then
+                        echo "✅ Phase A already completed. Skipping..."
+                        exit 0
+                    fi
+
                     echo "🚀 Running Phase A: Observability Bootstrap (ONE TIME)"
 
-                    # Create namespace
-                    kubectl create namespace observability || true
+                    # Namespace
+                    $KUBECTL_BIN create namespace observability || true
 
-                    # Add Helm repo
-                    helm repo add grafana https://grafana.github.io/helm-charts || true
-                    helm repo update
+                    # Helm repo
+                    $HELM_BIN repo add grafana https://grafana.github.io/helm-charts || true
+                    $HELM_BIN repo update
 
-                    # Install Loki (Distributed, production-style)
-                    helm upgrade --install loki grafana/loki \
+                    # Loki (Distributed – production style)
+                    $HELM_BIN upgrade --install loki grafana/loki \
                       --namespace observability \
                       --set loki.auth_enabled=false
 
-                    # Install Promtail
-                    helm upgrade --install promtail grafana/promtail \
+                    # Promtail
+                    $HELM_BIN upgrade --install promtail grafana/promtail \
                       --namespace observability \
                       --set config.clients[0].url=http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
 
-                    # Install Grafana
-                    helm upgrade --install grafana grafana/grafana \
+                    # Grafana
+                    $HELM_BIN upgrade --install grafana grafana/grafana \
                       --namespace observability \
                       --set adminPassword=admin \
                       --set service.type=ClusterIP
 
-                    # Mark Phase A as completed
-                    kubectl create configmap observability-bootstrap \
+                    # Mark completion
+                    $KUBECTL_BIN create configmap observability-bootstrap \
                       -n observability \
                       --from-literal=installed=true
 
@@ -109,10 +105,8 @@ pipeline {
             steps {
                 sh '''
                     echo "🧪 Running smoke test..."
-
                     tail -n 30 app.log || true
                     curl --fail http://127.0.0.1:${APP_PORT}
-
                     echo "✅ Smoke test passed"
                 '''
             }
@@ -136,7 +130,6 @@ pipeline {
             steps {
                 sh '''
                     echo "🔐 Running Trivy scan..."
-
                     $DOCKER_BIN --context ${DOCKER_CONTEXT} run --rm \
                       -v /Users/aditya/.docker/run/docker.sock:/var/run/docker.sock \
                       aquasec/trivy:latest image \
@@ -175,11 +168,10 @@ pipeline {
 
         /* ================= DEPLOY ================= */
 
-        stage('Deploy to Kubernetes (Ingress via Helm)') {
+        stage('Deploy to Kubernetes') {
             steps {
                 sh '''
                     echo "☸️ Deploying Severus AI..."
-
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                       --set image.repository=${IMAGE_NAME} \
                       --set image.tag=${IMAGE_TAG}
@@ -187,16 +179,14 @@ pipeline {
             }
         }
 
-        /* ================= POST-DEPLOY TESTS ================= */
+        /* ================= POST-DEPLOY ================= */
 
         stage('Post-Deployment Tests') {
             parallel {
 
                 stage('Ingress Reachability Test') {
                     steps {
-                        sh '''
-                            curl --fail http://severus-ai.local
-                        '''
+                        sh 'curl --fail http://severus-ai.local'
                     }
                 }
 
