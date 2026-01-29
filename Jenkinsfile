@@ -170,10 +170,13 @@ pipeline {
                 sh '''
                     echo "☸️ Deploying Severus AI..."
 
+                    # Cleanly handle immutable selector changes
+                    $KUBECTL_BIN delete deployment severus-ai --ignore-not-found
+
+                    # Deploy via Helm
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
-                      --force \
-                      --set image.repository=${IMAGE_NAME} \
-                      --set image.tag=${IMAGE_TAG}
+                    --set image.repository=${IMAGE_NAME} \
+                    --set image.tag=${IMAGE_TAG}
                 '''
             }
         }
