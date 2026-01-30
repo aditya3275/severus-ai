@@ -1,6 +1,10 @@
 import streamlit as st
 from pathlib import Path
 
+from utils.logger import setup_logger
+
+# ✅ ADDED
+
 from storage import init_db
 from auth import signup, login
 from chat import (
@@ -15,6 +19,12 @@ from file_utils import save_uploaded_file, ensure_extracted_text
 from utils.ollama_client import chat_with_model
 
 # ======================================================
+# LOGGER
+# ======================================================
+logger = setup_logger("app")  # ✅ ADDED
+logger.info("Application starting")  # ✅ ADDED
+
+# ======================================================
 # APP CONFIG
 # ======================================================
 st.set_page_config(
@@ -24,6 +34,7 @@ st.set_page_config(
 )
 
 init_db()
+logger.info("Database initialized")  # ✅ ADDED
 
 # ======================================================
 # SESSION STATE (MINIMAL & SAFE)
@@ -62,10 +73,12 @@ if not st.session_state.authenticated:
             p = st.text_input("Password", type="password")
             if st.button("Login", use_container_width=True):
                 if login(u, p):
+                    logger.info(f"User logged in: {u}")  # ✅ ADDED
                     st.session_state.authenticated = True
                     st.session_state.username = u
                     st.rerun()
                 else:
+                    logger.warning(f"Failed login attempt: {u}")  # ✅ ADDED
                     st.error("Invalid credentials")
 
         with tab2:
@@ -73,8 +86,10 @@ if not st.session_state.authenticated:
             p = st.text_input("New Password", type="password")
             if st.button("Create Account", use_container_width=True):
                 if signup(u, p):
+                    logger.info(f"User signed up: {u}")  # ✅ ADDED
                     st.success("Account created. Login now.")
                 else:
+                    logger.warning(f"Signup failed (username exists): {u}")  # ✅ ADDED
                     st.error("Username already exists")
 
 # ======================================================
@@ -85,6 +100,7 @@ else:
     st.sidebar.markdown(f"👤 **{st.session_state.username}**")
 
     if st.sidebar.button("🚪 Logout", use_container_width=True):
+        logger.info(f"User logged out: {st.session_state.username}")  # ✅ ADDED
         st.session_state.clear()
         st.rerun()
 
@@ -95,6 +111,7 @@ else:
 
     if st.sidebar.button("➕ New Chat", use_container_width=True):
         cid = create_chat(st.session_state.username)
+        logger.info(f"New chat created: chat_id={cid}")  # ✅ ADDED
         st.session_state.chat_id = cid
         st.session_state.has_document[cid] = False
         st.session_state.upload_notice[cid] = None
@@ -103,9 +120,11 @@ else:
     for cid, title in chats:
         c1, c2 = st.sidebar.columns([5, 1])
         if c1.button(title, key=f"open_{cid}", use_container_width=True):
+            logger.info(f"Chat opened: chat_id={cid}")  # ✅ ADDED
             st.session_state.chat_id = cid
             st.rerun()
         if c2.button("🗑️", key=f"del_{cid}"):
+            logger.info(f"Chat deleted: chat_id={cid}")  # ✅ ADDED
             delete_chat(cid)
             st.session_state.has_document.pop(cid, None)
             st.session_state.upload_notice.pop(cid, None)
@@ -144,12 +163,14 @@ else:
         "Choose files",
         type=allowed,
         accept_multiple_files=True,
-        key="uploader",  # IMPORTANT
+        key="uploader",
     )
 
-    # EXPLICIT CONFIRM BUTTON (CRITICAL FIX)
     if st.sidebar.button("⬆️ Confirm Upload"):
         if uploaded_files:
+            logger.info(
+                f"Files confirmed for upload: {[f.name for f in uploaded_files]} (chat_id={chat_id})"
+            )  # ✅ ADDED
             st.session_state.files_to_process = uploaded_files
 
     # ======================================================
@@ -161,6 +182,7 @@ else:
         for f in files:
             save_uploaded_file(chat_id, f)
             add_file_record(chat_id, f.name, f"data/uploads/{chat_id}/{f.name}")
+            logger.info(f"File uploaded: {f.name} (chat_id={chat_id})")  # ✅ ADDED
 
             if f.name.lower().endswith(("png", "jpg", "jpeg")):
                 st.session_state.upload_notice[chat_id] = "image"
@@ -189,9 +211,11 @@ else:
     # ======================================================
     messages = get_messages(chat_id)
 
-    # -------- SUMMARIZE BUTTON (LAZY & FAST) --------
     if st.session_state.has_document.get(chat_id):
         if st.button("📄 Summarize Uploaded Document", use_container_width=True):
+            logger.info(
+                f"Document summarization requested (chat_id={chat_id})"
+            )  # ✅ ADDED
             with st.spinner("Reading and summarizing document..."):
                 ensure_extracted_text(chat_id)
 
@@ -208,25 +232,14 @@ else:
 
             st.rerun()
 
-        st.markdown(
-            """
-            <div style="background:#1f2937;color:white;padding:10px;
-            border-radius:8px;margin-bottom:10px;">
-            🧠 <b>Answering from uploaded documents</b>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # -------- CHAT HISTORY --------
     for role, content in messages:
         with st.chat_message(role):
             st.markdown(content)
 
-    # -------- CHAT INPUT --------
     user_input = st.chat_input("Ask something...")
 
     if user_input:
+        logger.info(f"User message sent (chat_id={chat_id})")  # ✅ ADDED
         save_message(chat_id, "user", user_input)
 
         reply = chat_with_model(

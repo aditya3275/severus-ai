@@ -1,1 +1,19 @@
+# macOS
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Runtime data
+data/
+*.db
+
+# Local scripts / notes
+start.txt
+stop.txt
+observation.txt
+instrctions.txt
+
+# One-off recovery files
+fluent-bit-config-fixed.yaml
