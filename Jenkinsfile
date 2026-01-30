@@ -23,41 +23,25 @@ pipeline {
             }
         }
 
-        /* ================= PHASE A (RUN ONCE) ================= */
+        /* ================= OBSERVABILITY ================= */
 
-        stage('Phase A – Observability Bootstrap') {
+        stage('Deploy Observability Stack') {
             steps {
                 sh '''
-                    echo "🔍 Checking if Phase A already ran..."
-
-                    if $KUBECTL_BIN get configmap observability-bootstrap -n observability >/dev/null 2>&1; then
-                        echo "✅ Phase A already completed. Skipping..."
-                        exit 0
-                    fi
-
-                    echo "🚀 Running Phase A: Observability Bootstrap (ONE TIME)"
+                    echo "🚀 Deploying OpenSearch and Fluent Bit (idempotent)"
 
                     $KUBECTL_BIN create namespace observability || true
 
-                    $HELM_BIN repo add grafana https://grafana.github.io/helm-charts || true
+                    $HELM_BIN repo add opensearch https://opensearch-project.github.io/helm-charts || true
                     $HELM_BIN repo update
 
-                    $HELM_BIN upgrade --install loki grafana/loki-stack \
-                      --namespace observability \
-                      --set grafana.enabled=false \
-                      --set loki.persistence.enabled=false \
-                      --set loki.auth_enabled=false
-
-                    $HELM_BIN upgrade --install grafana grafana/grafana \
-                      --namespace observability \
-                      --set adminPassword=admin \
-                      --set service.type=ClusterIP
-
-                    $KUBECTL_BIN create configmap observability-bootstrap \
+                    $HELM_BIN upgrade --install opensearch opensearch/opensearch \
                       -n observability \
-                      --from-literal=installed=true
+                      -f observability/opensearch/values.yaml
 
-                    echo "✅ Phase A completed successfully"
+                    $KUBECTL_BIN apply -f observability/fluent-bit-manual/fluent-bit.yaml
+
+                    echo "✅ Observability stack deployed"
                 '''
             }
         }
@@ -202,7 +186,6 @@ pipeline {
                     }
                 }
 
-                /* ✅ RESTORED EXACTLY WHERE IT BELONGS */
                 stage('K3s Version Validation') {
                     steps {
                         sh '''
