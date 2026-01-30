@@ -1,0 +1,40 @@
+service:
+  flush: 1
+  logLevel: info
+
+input:
+  tail:
+    enabled: true
+    path: /var/log/containers/*.log
+    parser: cri
+
+filter:
+  kubernetes:
+    enabled: true
+
+output:
+  opensearch:
+    enabled: true
+    host: opensearch-cluster-master
+    port: 9200
+    index: logs-app-%Y.%m.%d
+    type: _doc
+
+daemonSet:
+  hostNetwork: false
+  dnsPolicy: ClusterFirst
+
+  volumes:
+    - name: varlogcontainers
+      hostPath:
+        path: /var/log/containers
+
+  volumeMounts:
+    - name: varlogcontainers
+      mountPath: /var/log/containers
+      readOnly: true
+
+# 🔴 THIS IS THE KEY LINE — DISABLE MACHINE ID
+machineID:
+  enabled: false
+
