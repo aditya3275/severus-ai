@@ -26,9 +26,12 @@ pipeline {
         /* ================= OBSERVABILITY ================= */
 
         stage('Deploy Observability Stack') {
+            when {
+                changeset "observability/**"
+            }
             steps {
                 sh '''
-                    echo "🚀 Deploying OpenSearch and Fluent Bit (idempotent)"
+                    echo "🚀 Observability config changed — deploying OpenSearch and Fluent Bit"
 
                     $KUBECTL_BIN create namespace observability || true
 
@@ -36,8 +39,8 @@ pipeline {
                     $HELM_BIN repo update
 
                     $HELM_BIN upgrade --install opensearch opensearch/opensearch \
-                      -n observability \
-                      -f observability/opensearch/values.yaml
+                    -n observability \
+                    -f observability/opensearch/values.yaml
 
                     $KUBECTL_BIN apply -f observability/fluent-bit-manual/fluent-bit.yaml
 
