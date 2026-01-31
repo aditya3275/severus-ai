@@ -252,9 +252,17 @@ pipeline {
         stage('Performance Evaluation') {
             when {
                 expression {
-                    // Only run if enabled in values.yaml
+                    // Check if performance test is enabled (including default values from values.yaml)
                     def enabled = sh(
-                        script: '$HELM_BIN get values severus-ai -o json 2>/dev/null | grep -q \'"enabled":true\' && echo "true" || echo "false"',
+                        script: '''
+                            # Check both user-supplied values and defaults
+                            ENABLED=$($HELM_BIN get values severus-ai --all -o json 2>/dev/null | grep -o '"performanceTest"[^}]*"enabled"[[:space:]]*:[[:space:]]*true' || echo "")
+                            if [ -n "$ENABLED" ]; then
+                                echo "true"
+                            else
+                                echo "false"
+                            fi
+                        ''',
                         returnStdout: true
                     ).trim()
                     return enabled == 'true'
