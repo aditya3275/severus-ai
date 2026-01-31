@@ -8,11 +8,11 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: severus-ai
+      {{- include "severus-ai.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: severus-ai
+        {{- include "severus-ai.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: severus-ai

@@ -132,6 +132,15 @@ pipeline {
                 sh '''
                     echo "☸️ Deploying Severus AI with Ingress..."
 
+                    # Clean up existing deployment to avoid immutable selector conflicts
+                    echo "🧹 Cleaning up existing deployment (if any)..."
+                    $KUBECTL_BIN delete deployment severus-ai --ignore-not-found=true
+                    
+                    # Wait a moment for cleanup to complete
+                    sleep 2
+
+                    # Deploy with Helm
+                    echo "📦 Running Helm upgrade..."
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                       --set image.repository=${IMAGE_NAME} \
                       --set image.tag=${IMAGE_TAG}
