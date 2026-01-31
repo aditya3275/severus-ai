@@ -85,11 +85,20 @@ RESOURCE_LOG=/tmp/resource_usage.log
 echo "timestamp,pod,cpu_millicores,memory_mib" > "$RESOURCE_LOG"
  
 monitor_resources() {
+  # Trap for clean exit
+  trap "exit" SIGTERM
   while true; do
     TS=$(date +%s)
-    $KUBECTL_CMD top pod --no-headers 2>/dev/null | \
-      awk -v ts="$TS" '{print ts "," $1 "," $2 "," $3}' >> "$RESOURCE_LOG"
-    sleep 2
+    # Get top for all pods and filter later to be efficient, or try to filter here
+    # We filter by common names or just collect all and let the summary handle it
+    $KUBECTL_CMD top pod --no-headers 2>/dev/null >> "$RESOURCE_LOG.tmp" || true
+    while read -r line; do
+       if [ -n "$line" ]; then
+         echo "$TS,$line" | awk '{print $1 "," $2 "," $3 "," $4}' >> "$RESOURCE_LOG"
+       fi
+    done < "$RESOURCE_LOG.tmp"
+    rm -f "$RESOURCE_LOG.tmp"
+    sleep 5
   done
 }
  
@@ -208,14 +217,21 @@ echo "=============================================="
 if [[ $(wc -l <"$RESOURCE_LOG") -le 1 ]]; then
   echo "No resource metrics captured (metrics became available late)"
 else
-  awk -F',' '
+  # Filter to show only relevant pods if POD_LABELS is used, otherwise show all
+  awk -F',' -v label_pods="${POD_LABELS[*]}" '
   NR>1 {
+    # If we have labels, only track pods found in labels
+    # Simplified: show pods that start with or match our app names
     cpu[$2] = (cpu[$2] > $3 ? cpu[$2] : $3)
     mem[$2] = (mem[$2] > $4 ? mem[$2] : $4)
   }
   END {
-    for (p in cpu)
-      printf "Pod: %-35s CPU_peak=%s Memory_peak=%s\n", p, cpu[p], mem[p]
+    for (p in cpu) {
+      # Filter out "mock" or invalid data
+      if (p != "mock" && cpu[p] != "data") {
+        printf "Pod: %-35s CPU_peak=%s Memory_peak=%s\n", p, cpu[p], mem[p]
+      }
+    }
   }' "$RESOURCE_LOG"
 fi
  
@@ -251,9 +267,13 @@ if [[ ${#POD_LABELS[@]} -gt 0 ]]; then
       TOTAL_LOG_REQUESTS=0
       for POD in $($KUBECTL_CMD get pods -l "$LABEL" --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}'); do
         # Count requests in pod logs. Using "Streamlit" as a fallback check if "GET" is not found
-        # Streamlit doesn't use standard access logs by default
-        GET_LOGS=$($KUBECTL_CMD logs "$POD" --since=5m 2>/dev/null | grep -c "GET" || echo "0")
-        STREAMLIT_LOGS=$($KUBECTL_CMD logs "$POD" --since=5m 2>/dev/null | grep -c "Streamlit" || echo "0")
+        # grep -c always returns a number, so we don't need || echo "0" which causes "0 0" bugs
+        GET_LOGS=$($KUBECTL_CMD logs "$POD" --since=5m 2>/dev/null | grep -c "GET" || true)
+        STREAMLIT_LOGS=$($KUBECTL_CMD logs "$POD" --since=5m 2>/dev/null | grep -c "Streamlit" || true)
+        
+        # Ensure they are valid numbers (default to 0 if empty)
+        [[ -z "$GET_LOGS" ]] && GET_LOGS=0
+        [[ -z "$STREAMLIT_LOGS" ]] && STREAMLIT_LOGS=0
         
         if [ "$GET_LOGS" -gt "$STREAMLIT_LOGS" ]; then
           LOG_COUNT=$GET_LOGS
