@@ -23,32 +23,6 @@ pipeline {
             }
         }
 
-        /* ================= OBSERVABILITY ================= */
-
-        stage('Deploy Observability Stack') {
-            when {
-                changeset "observability/**"
-            }
-            steps {
-                sh '''
-                    echo "🚀 Observability config changed — deploying OpenSearch and Fluent Bit"
-
-                    $KUBECTL_BIN create namespace observability || true
-
-                    $HELM_BIN repo add opensearch https://opensearch-project.github.io/helm-charts || true
-                    $HELM_BIN repo update
-
-                    $HELM_BIN upgrade --install opensearch opensearch/opensearch \
-                    -n observability \
-                    -f observability/opensearch/values.yaml
-
-                    $KUBECTL_BIN apply -f observability/fluent-bit-manual/fluent-bit.yaml
-
-                    echo "✅ Observability stack deployed"
-                '''
-            }
-        }
-
         /* ================= BUILD ================= */
 
         stage('Application Build') {
@@ -84,8 +58,13 @@ pipeline {
             steps {
                 sh '''
                     echo "🧪 Running smoke test..."
+
+                    echo "---- App logs ----"
                     tail -n 30 app.log || true
+                    echo "------------------"
+
                     curl --fail http://127.0.0.1:${APP_PORT}
+
                     echo "✅ Smoke test passed"
                 '''
             }
@@ -109,6 +88,7 @@ pipeline {
             steps {
                 sh '''
                     echo "🔐 Running Trivy scan..."
+
                     $DOCKER_BIN --context ${DOCKER_CONTEXT} run --rm \
                       -v /Users/aditya/.docker/run/docker.sock:/var/run/docker.sock \
                       aquasec/trivy:latest image \
@@ -147,12 +127,10 @@ pipeline {
 
         /* ================= DEPLOY ================= */
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Kubernetes (Ingress via Helm)') {
             steps {
                 sh '''
-                    echo "☸️ Deploying Severus AI..."
-
-                    $KUBECTL_BIN delete deployment severus-ai --ignore-not-found
+                    echo "☸️ Deploying Severus AI with Ingress..."
 
                     $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                       --set image.repository=${IMAGE_NAME} \
@@ -161,22 +139,51 @@ pipeline {
             }
         }
 
-        /* ================= POST-DEPLOY ================= */
+        /* ================= POST-DEPLOY PARALLEL TESTS ================= */
 
         stage('Post-Deployment Tests') {
             parallel {
 
                 stage('Ingress Reachability Test') {
                     steps {
-                        sh 'curl --fail http://severus-ai.local'
+                        sh '''
+                            echo "🌐 Testing Ingress reachability..."
+                            curl --fail http://severus-ai.local
+                            echo "✅ Ingress reachable"
+                        '''
+                    }
+                }
+
+                stage('Ollama Connectivity Test') {
+                    steps {
+                        sh '''
+                            echo "🧠 Testing Ollama connectivity from pod..."
+
+                            POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
+                            echo "Using pod: $POD"
+
+                            OLLAMA_URL=$($KUBECTL_BIN exec $POD -- sh -c 'echo $OLLAMA_BASE_URL')
+
+                            if [ -z "$OLLAMA_URL" ]; then
+                              echo "❌ OLLAMA_BASE_URL is NOT set"
+                              exit 1
+                            fi
+
+                            echo "OLLAMA_BASE_URL=$OLLAMA_URL"
+                            $KUBECTL_BIN exec $POD -- curl --fail ${OLLAMA_URL}/api/tags
+
+                            echo "✅ Ollama reachable"
+                        '''
                     }
                 }
 
                 stage('Kubernetes Health Test') {
                     steps {
                         sh '''
+                            echo "🩺 Checking Kubernetes health..."
                             $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
                             $KUBECTL_BIN get pods -l app=severus-ai
+                            echo "✅ Kubernetes healthy"
                         '''
                     }
                 }
@@ -184,39 +191,42 @@ pipeline {
                 stage('Log Sanity Test') {
                     steps {
                         sh '''
+                            echo "📜 Checking application logs..."
                             $KUBECTL_BIN logs deployment/severus-ai | tail -n 50
+                            echo "✅ Logs look sane"
                         '''
                     }
                 }
 
+                /* 🆕 NEW STAGE */
                 stage('K3s Version Validation') {
                     steps {
                         sh '''
-                            echo "🧪 Validating Helm chart across K3s versions..."
+                            echo "🧪 Validating Helm chart against multiple K3s versions..."
+
                             mkdir -p k3s-validation-logs
 
-                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35 v1.36; do
+                            for VERSION in v1.26 v1.27 v1.28 v1.29 v1.30 v1.31 v1.32 v1.33 v1.34 v1.35; do
                               echo "▶ Testing against K3s $VERSION"
 
                               {
                                 echo "====================================="
-                                echo "Target K3s Version: $VERSION"
+                                echo "K3s Version Target: $VERSION"
                                 echo "Timestamp: $(date)"
                                 echo "-------------------------------------"
-
                                 $HELM_BIN upgrade --install severus-ai helm/severus-ai \
                                   --dry-run --debug \
                                   --set image.repository=${IMAGE_NAME} \
                                   --set image.tag=${IMAGE_TAG} \
                                   --set global.k3sVersion=$VERSION
-
                                 echo "-------------------------------------"
                                 $KUBECTL_BIN version
                                 echo "====================================="
-                              } > k3s-validation-logs/k3s-${VERSION}.log
+                              } > k3s-validation-logs/k3s-$VERSION.log
+
                             done
 
-                            echo "✅ K3s compatibility validation complete"
+                            echo "✅ K3s version validation completed"
                         '''
                     }
                     post {

@@ -1,0 +1,175 @@
+start docker desktop:
+docker build -t adityahere/severus-ai:v1 .
+
+
+ docker run -d \                        
+  -p 8501:8501 \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  --name severus-ai \
+  adityahere/severus-ai:v1
+
+
+minikube:
+minikube start
+minikube stop
+
+jenkins commands:
+brew services start jenkins-lts  
+brew services restart jenkins-lts
+brew upgrade jenkins-lts
+brew services stop jenkins-lts
+http://localhost:8080/
+
+git:
+git init
+git add <file>
+git commit -m "msg"
+git push -u origin main
+
+
+
+
+application local host:
+http://localhost:8503/
+
+
+while about to start :
+docker info
+k3d cluster list
+k3d cluster start severus-cluster (if cluster stopped)
+kubectl get nodes
+brew services start jenkins-lts
+brew services list | grep jenkins (verify)
+http://localhost:8080 (open jenkins)
+
+the application link comes from ingress:
+kubectl get ingress
+Final Application URL
+ http://severus-ai.local
+
+
+Stop commands
+brew services stop jenkins-lts
+quit docker
+k3d cluster stop severus-cluster
+
+(Phase A)
+
+Phase A = Platform Observability Bootstrap
+
+We will install and validate once:
+
+Loki (logs backend)
+
+Promtail (log shipper)
+
+Grafana (visualization)
+
+(Later) Prometheus (metrics)
+This phase:
+
+runs only once per cluster
+
+provisions cluster-level observability
+
+is NOT application-specific
+
+must never re-run on every CI build
+
+architecture
+Severus AI Pods
+   │
+   └─ stdout logs
+        │
+        ▼
+Fluent Bit (DaemonSet)
+        │
+        ▼
+OpenSearch (log storage + search)
+        │
+        ▼
+Grafana (visualization, dashboards, alerts)
+
+Deploy OpenSearch
+helm repo add opensearch https://opensearch-project.github.io/helm-charts
+helm install opensearch opensearch/opensearch \
+  -n observability --create-namespace
+
+
+Replace Promtail with Fluent Bit
+helm repo add fluent https://fluent.github.io/helm-charts
+helm install fluent-bit fluent/fluent-bit \
+  -n observability
+
+
+create config maps
+kubectl delete configmap fluent-bit-parsers -n observability --ignore-not-found
+kubectl delete configmap fluent-bit-config -n observability --ignore-not-found
+kubectl create configmap fluent-bit-parsers \
+  -n observability \
+  --from-file=parsers.conf=observability/fluent-bit-manual/parsers.conf
+kubectl create configmap fluent-bit-config \
+  -n observability \
+  --from-file=fluent-bit.conf=observability/fluent-bit-manual/fluent-bit.conf
+
+
+STEP 1.1 — Create a clean folder for observability configs
+mkdir -p observability/opensearch
+mkdir -p observability/fluent-bit
+
+STEP 1.2 — Create OpenSearch Helm values file
+touch observability/opensearch/values.yaml
+
+Paste THIS into values.yaml
+replicas: 1
+
+opensearchJavaOpts: "-Xms512m -Xmx512m"
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "1"
+
+config:
+  opensearch.yml: |
+    plugins.security.disabled: true
+
+
+STEP 1.3 — Deploy OpenSearch
+helm repo add opensearch https://opensearch-project.github.io/helm-charts
+helm repo update
+
+download Grafana
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm upgrade --install grafana grafana/grafana \
+  -n observability \
+  -f observability/grafana/values.yaml
+kubectl get pods -n observability -w
+kubectl port-forward svc/grafana 3000:80 -n observability
+
+
+opensearch data source url for grafana :
+ http://opensearch-cluster-master:9200 
+ index name : logs-*
+latest link for opensearch 
+URL: http://opensearch-cluster-master.observability.svc.cluster.local:9200
+
+Prometheus
+http://localhost:9090
+
+grafana
+kubectl get svc -n observability | grep grafana
+kubectl port-forward -n observability svc/kube-prometheus-grafana 3000:80
+kubectl port-forward -n observability svc/kube-prometheus-grafana 3000:3000
+http://localhost:3000
+
+admin
+admin123
