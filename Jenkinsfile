@@ -282,14 +282,14 @@ pipeline {
                         USE_JQ=false
                     fi
                     
-                    # Extract values from Helm (with fallback)
+                    # Extract values from Helm (with fallback) - using --all to include defaults
                     if [ "$USE_JQ" = "true" ]; then
-                        TARGETS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.targets[]?' 2>/dev/null || echo "http://severus-ai.local")
-                        TOTAL_REQUESTS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.totalRequests // 100' 2>/dev/null)
-                        CONCURRENCY=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.concurrency // 5' 2>/dev/null)
-                        RUNS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.runs // 1' 2>/dev/null)
-                        SLEEP=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.sleepBetweenRuns // 0' 2>/dev/null)
-                        POD_LABELS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.podLabels[]?' 2>/dev/null || echo "app.kubernetes.io/name=severus-ai")
+                        TARGETS=$($HELM_BIN get values severus-ai --all -o json | jq -r '.performanceTest.targets[]?' 2>/dev/null || echo "http://severus-ai.local")
+                        TOTAL_REQUESTS=$($HELM_BIN get values severus-ai --all -o json | jq -r '.performanceTest.totalRequests // 100' 2>/dev/null)
+                        CONCURRENCY=$($HELM_BIN get values severus-ai --all -o json | jq -r '.performanceTest.concurrency // 5' 2>/dev/null)
+                        RUNS=$($HELM_BIN get values severus-ai --all -o json | jq -r '.performanceTest.runs // 1' 2>/dev/null)
+                        SLEEP=$($HELM_BIN get values severus-ai --all -o json | jq -r '.performanceTest.sleepBetweenRuns // 0' 2>/dev/null)
+                        POD_LABELS=$($HELM_BIN get values severus-ai --all -o json | jq -r '.performanceTest.podLabels[]?' 2>/dev/null || echo "app.kubernetes.io/name=severus-ai")
                     else
                         # Fallback: use defaults
                         TARGETS="http://severus-ai.local"
