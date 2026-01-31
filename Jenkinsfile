@@ -246,5 +246,98 @@ pipeline {
                 }
             }
         }
+
+        /* ================= PERFORMANCE EVALUATION ================= */
+
+        stage('Performance Evaluation') {
+            when {
+                expression {
+                    // Only run if enabled in values.yaml
+                    def enabled = sh(
+                        script: '$HELM_BIN get values severus-ai -o json 2>/dev/null | grep -q \'"enabled":true\' && echo "true" || echo "false"',
+                        returnStdout: true
+                    ).trim()
+                    return enabled == 'true'
+                }
+            }
+            steps {
+                sh '''
+                    echo "🚀 Starting Performance Evaluation..."
+                    echo "=============================================="
+                    
+                    # Check if jq is available (optional, fallback to grep)
+                    if command -v jq &> /dev/null; then
+                        echo "Using jq for JSON parsing"
+                        USE_JQ=true
+                    else
+                        echo "jq not found, using grep/awk fallback"
+                        USE_JQ=false
+                    fi
+                    
+                    # Extract values from Helm (with fallback)
+                    if [ "$USE_JQ" = "true" ]; then
+                        TARGETS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.targets[]?' 2>/dev/null || echo "http://severus-ai.local")
+                        TOTAL_REQUESTS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.totalRequests // 100' 2>/dev/null)
+                        CONCURRENCY=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.concurrency // 5' 2>/dev/null)
+                        RUNS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.runs // 1' 2>/dev/null)
+                        SLEEP=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.sleepBetweenRuns // 0' 2>/dev/null)
+                        POD_LABELS=$($HELM_BIN get values severus-ai -o json | jq -r '.performanceTest.podLabels[]?' 2>/dev/null || echo "app.kubernetes.io/name=severus-ai")
+                    else
+                        # Fallback: use defaults
+                        TARGETS="http://severus-ai.local"
+                        TOTAL_REQUESTS=100
+                        CONCURRENCY=5
+                        RUNS=1
+                        SLEEP=0
+                        POD_LABELS="app.kubernetes.io/name=severus-ai"
+                    fi
+                    
+                    echo "Configuration:"
+                    echo "  Targets        : $TARGETS"
+                    echo "  Total Requests : $TOTAL_REQUESTS"
+                    echo "  Concurrency    : $CONCURRENCY"
+                    echo "  Runs           : $RUNS"
+                    echo "  Sleep          : ${SLEEP}s"
+                    echo "  Pod Labels     : $POD_LABELS"
+                    echo "=============================================="
+                    
+                    # Build command
+                    CMD="bash scripts/stress_pod.sh"
+                    
+                    # Add targets
+                    for TARGET in $TARGETS; do
+                        CMD="$CMD -t $TARGET"
+                    done
+                    
+                    # Add parameters
+                    CMD="$CMD -tr $TOTAL_REQUESTS -c $CONCURRENCY -r $RUNS -s $SLEEP"
+                    
+                    # Add pod labels
+                    for LABEL in $POD_LABELS; do
+                        CMD="$CMD -p $LABEL"
+                    done
+                    
+                    # Execute and capture output
+                    echo ""
+                    echo "Executing: $CMD"
+                    echo "=============================================="
+                    $CMD | tee performance-report.txt
+                    
+                    echo ""
+                    echo "✅ Performance Evaluation completed"
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'performance-report.txt', fingerprint: true, allowEmptyArchive: true
+                }
+                success {
+                    echo '✅ Performance test passed'
+                }
+                failure {
+                    echo '❌ Performance test failed'
+                }
+            }
+        }
     }
 }

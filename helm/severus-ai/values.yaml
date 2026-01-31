@@ -20,3 +20,27 @@ ingress:
 
 env:
   OLLAMA_BASE_URL: "http://host.k3d.internal:11434"
+
+# Performance Testing Configuration
+performanceTest:
+  # Enable/disable performance evaluation stage in CI/CD
+  enabled: true
+  
+  # Target URLs to test (can specify multiple)
+  targets:
+    - "http://severus-ai.local"
+  
+  # Load parameters
+  totalRequests: 100        # Total HTTP requests per run
+  concurrency: 5            # Number of concurrent requests
+  runs: 1                   # Number of test runs
+  sleepBetweenRuns: 0       # Sleep duration between runs (seconds)
+  
+  # Pod validation
+  podLabels:
+    - "app.kubernetes.io/name=severus-ai"
+  
+  # Optional: Resource thresholds for validation
+  thresholds:
+    maxCpuMillicores: 1000  # Maximum acceptable CPU usage (millicores)
+    maxMemoryMiB: 512       # Maximum acceptable memory usage (MiB)
