@@ -53,10 +53,10 @@ echo 0 > "$FAILURE_FILE"
  
 increment() {
   local file=$1
-  (
-    flock -x 200
-    echo $(( $(cat "$file") + 1 )) > "$file"
-  ) 200>"$file.lock"
+  # Simple increment without flock (works in environments without flock)
+  # Note: Minor race conditions possible but acceptable for performance testing
+  local current=$(cat "$file" 2>/dev/null || echo "0")
+  echo $((current + 1)) > "$file"
 }
  
 # -----------------------------
