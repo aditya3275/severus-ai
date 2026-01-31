@@ -168,7 +168,7 @@ pipeline {
                         sh '''
                             echo "🧠 Testing Ollama connectivity from pod..."
 
-                            POD=$($KUBECTL_BIN get pod -l app=severus-ai -o jsonpath="{.items[0].metadata.name}")
+                            POD=$($KUBECTL_BIN get pod -l app.kubernetes.io/name=severus-ai -o jsonpath="{.items[0].metadata.name}")
                             echo "Using pod: $POD"
 
                             OLLAMA_URL=$($KUBECTL_BIN exec $POD -- sh -c 'echo $OLLAMA_BASE_URL')
@@ -191,7 +191,7 @@ pipeline {
                         sh '''
                             echo "🩺 Checking Kubernetes health..."
                             $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
-                            $KUBECTL_BIN get pods -l app=severus-ai
+                            $KUBECTL_BIN get pods -l app.kubernetes.io/name=severus-ai
                             echo "✅ Kubernetes healthy"
                         '''
                     }
