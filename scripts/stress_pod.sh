@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+
+# Use KUBECTL_BIN environment variable if set, otherwise default to kubectl
+KUBECTL_CMD="${KUBECTL_BIN:-kubectl}"
  
 usage() {
   echo ""
@@ -77,7 +80,7 @@ echo "timestamp,pod,cpu_millicores,memory_mib" > "$RESOURCE_LOG"
 monitor_resources() {
   while true; do
     TS=$(date +%s)
-    kubectl top pod --no-headers 2>/dev/null | \
+    $KUBECTL_CMD top pod --no-headers 2>/dev/null | \
       awk -v ts="$TS" '{print ts "," $1 "," $2 "," $3}' >> "$RESOURCE_LOG"
     sleep 2
   done
@@ -139,15 +142,19 @@ EOF
  
       PIDS+=($!)
  
+      # Limit concurrency - wait for oldest process if we hit the limit
       if (( ${#PIDS[@]} >= CONCURRENCY )); then
-        wait "${PIDS[0]}"
+        wait "${PIDS[0]}" 2>/dev/null || true
         PIDS=("${PIDS[@]:1}")
       fi
     done
  
+    # CRITICAL: Wait for ALL remaining background processes
+    echo "Waiting for remaining ${#PIDS[@]} requests to complete..."
     for pid in "${PIDS[@]}"; do
-      wait "$pid"
+      wait "$pid" 2>/dev/null || true
     done
+    echo "All requests completed for $TARGET"
   done
  
   RUN_END=$(date +%s)
@@ -216,7 +223,7 @@ if [[ ${#POD_LABELS[@]} -gt 0 ]]; then
   EXPECTED_TOTAL=$((TOTAL_REQUESTS * RUNS))
  
   for LABEL in "${POD_LABELS[@]}"; do
-    TOTAL_PODS=$(kubectl get pods -l "$LABEL" --field-selector=status.phase=Running -o name | wc -l)
+    TOTAL_PODS=$($KUBECTL_CMD get pods -l "$LABEL" --field-selector=status.phase=Running -o name | wc -l)
     echo "Service label       : $LABEL"
     echo "Running pods        : $TOTAL_PODS"
     
@@ -234,9 +241,9 @@ if [[ ${#POD_LABELS[@]} -gt 0 ]]; then
       echo "----------------------------------------------"
       
       TOTAL_LOG_REQUESTS=0
-      for POD in $(kubectl get pods -l "$LABEL" --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}'); do
+      for POD in $($KUBECTL_CMD get pods -l "$LABEL" --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}'); do
         # Count GET requests in pod logs (Streamlit access logs)
-        LOG_COUNT=$(kubectl logs "$POD" 2>/dev/null | grep -c "GET" || echo "0")
+        LOG_COUNT=$($KUBECTL_CMD logs "$POD" 2>/dev/null | grep -c "GET" || echo "0")
         # Ensure it's a valid number
         if ! [[ "$LOG_COUNT" =~ ^[0-9]+$ ]]; then
           LOG_COUNT=0

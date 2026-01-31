@@ -329,6 +329,10 @@ pipeline {
                     echo ""
                     echo "Executing: $CMD"
                     echo "=============================================="
+                    
+                    # Export KUBECTL_BIN so the script can use it
+                    export KUBECTL_BIN=$KUBECTL_BIN
+                    
                     $CMD | tee performance-report.txt
                     
                     echo ""
