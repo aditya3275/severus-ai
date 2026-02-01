@@ -31,8 +31,8 @@ performanceTest:
     - "http://severus-ai.local"
   
   # Load parameters
-  totalRequests: 1000        # Total requests
-  concurrency: 1000         # SEND ALL AT ONCE
+  totalRequests: 5000        # Total requests
+  concurrency: 5000        # SEND ALL AT ONCE
   runs: 1                   # Single massive burst
   sleepBetweenRuns: 2       # Small sleep
   
