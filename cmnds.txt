@@ -1,0 +1,23 @@
+Open Grafana (Dashboards & Logs)
+kubectl port-forward svc/kube-prometheus-grafana 3000:80 -n observability
+http://localhost:3000
+Credentials:
+User: admin
+Password: admin123
+
+open search data source url
+http://opensearch-cluster-master.observability.svc.cluster.local:9200 
+(Alternatively, simplified: http://opensearch-cluster-master.observability:9200
+Index name: logs-app-*
+
+grafana query
+kubernetes.pod_name : "severus-ai*"
+
+2. Open Prometheus (Raw Metrics)
+Use this if you want to run raw queries (PromQL) to see your custom app metrics.
+
+kubectl port-forward svc/kube-prometheus-kube-prome-prometheus 9090:9090 -n observability
+Open your browser to: http://localhost:9090
+Query Example: Type messages_sent_total and click Execute to see your app's data
+
+query : messages_sent_total
