@@ -31,9 +31,9 @@ performanceTest:
     - "http://severus-ai.local"
   
   # Load parameters
-  totalRequests: 1000        # Increased for better stress testing
-  concurrency: 50           # Increased for more aggressive testing
-  runs: 5                   # Increased for better stress testing
+  totalRequests: 1000        # Total requests
+  concurrency: 1000         # SEND ALL AT ONCE
+  runs: 1                   # Single massive burst
   sleepBetweenRuns: 2       # Small sleep
   
   # Pod validation

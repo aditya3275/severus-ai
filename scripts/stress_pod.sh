@@ -154,39 +154,25 @@ EOF
 )
  
       (
-        if curl -s --max-time 10 -X GET "$TARGET" > /dev/null 2>&1; then
+        if curl -s --max-time 15 -X GET "$TARGET" > /dev/null 2>&1; then
           increment "$SUCCESS_DIR" "$RUN"
         else
           increment "$FAILURE_DIR" "$RUN"
         fi
       ) &
+    done
  
-      # Progress logging based on actual completions
-      PROGRESS_STEP=$(( TOTAL_REQUESTS / 10 ))
-      [[ $PROGRESS_STEP -eq 0 ]] && PROGRESS_STEP=10
-      
+    # Wait for the remaining requests with a timeout to avoid hangs
+    echo "Burst fired! Waiting up to 60s for the batch to complete..."
+    for t in $(seq 1 60); do
       S_COUNT=$(ls -1 "$SUCCESS_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
       F_COUNT=$(ls -1 "$FAILURE_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
       TOTAL_DONE=$((S_COUNT + F_COUNT))
       
-      CURRENT_STEP=$(( TOTAL_DONE / PROGRESS_STEP ))
-      if (( CURRENT_STEP > LAST_LOGGED_STEP )); then
-        echo "[Run $RUN] Progress: $((CURRENT_STEP * PROGRESS_STEP)) finished | Success: $S_COUNT | Failure: $F_COUNT"
-        LAST_LOGGED_STEP=$CURRENT_STEP
-      fi
-
-      # Greedy concurrency control: keep the pipe full
-      while [ $(jobs -r | wc -l) -ge "$CONCURRENCY" ]; do
-        sleep 0.05
-      done
-    done
- 
-    # Wait for the remaining requests with a timeout to avoid hangs
-    echo "Waiting up to 30s for the remaining batch to complete..."
-    for t in $(seq 1 30); do
-      RUNNING_JOBS=$(jobs -r | wc -l)
-      if [ "$RUNNING_JOBS" -eq 0 ]; then break; fi
-      sleep 1
+      echo "[Run $RUN] Progress: $TOTAL_DONE/$TOTAL_REQUESTS finished | Success: $S_COUNT | Failure: $F_COUNT"
+      
+      if [ "$TOTAL_DONE" -ge "$TOTAL_REQUESTS" ]; then break; fi
+      sleep 2
     done
     # Kill any truly stuck requests so we can proceed to the next run
     if [ $(jobs -r | wc -l) -gt 0 ]; then
