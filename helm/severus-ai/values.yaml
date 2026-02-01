@@ -32,7 +32,7 @@ performanceTest:
   
   # Load parameters
   totalRequests: 1000        # Increased for better stress testing
-  concurrency: 20           # Increased for better stress testing
+  concurrency: 50           # Increased for more aggressive testing
   runs: 5                   # Increased for better stress testing
   sleepBetweenRuns: 2       # Small sleep
   

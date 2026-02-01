@@ -137,7 +137,6 @@ for RUN in $(seq 1 "$RUNS"); do
  
   for TARGET in "${TARGETS[@]}"; do
     echo "Sending $TOTAL_REQUESTS requests to $TARGET"
-    PIDS=()
  
     for i in $(seq 1 "$TOTAL_REQUESTS"); do
       # Progress logging every 10% or at least every 100 requests
@@ -170,20 +169,16 @@ EOF
         fi
       ) &
  
-      PIDS+=($!)
- 
-      # Limit concurrency - wait for oldest process if we hit the limit
-      if (( ${#PIDS[@]} >= CONCURRENCY )); then
-        wait "${PIDS[0]}" 2>/dev/null || true
-        PIDS=("${PIDS[@]:1}")
-      fi
+      # Greedy concurrency control: keep the pipe full
+      # We poll running jobs so we dont wait on a single slow request
+      while [ $(jobs -r | wc -l) -ge "$CONCURRENCY" ]; do
+        sleep 0.05
+      done
     done
  
     # CRITICAL: Wait for ALL remaining background processes
-    echo "Waiting for remaining ${#PIDS[@]} requests to complete..."
-    for pid in "${PIDS[@]}"; do
-      wait "$pid" 2>/dev/null || true
-    done
+    echo "Waiting for remaining requests to complete..."
+    wait
     echo "All requests completed for $TARGET"
   done
  
