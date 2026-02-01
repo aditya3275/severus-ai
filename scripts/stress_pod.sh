@@ -56,7 +56,9 @@ mkdir -p "$SUCCESS_DIR" "$FAILURE_DIR"
 
 increment() {
   local dir=$1
-  mktemp -p "$dir" "req.XXXXXX" > /dev/null
+  local run_num=$2
+  mkdir -p "$dir/run_$run_num"
+  mktemp -p "$dir/run_$run_num" "req.XXXXXX" > /dev/null
 }
 
 cleanup_results() {
@@ -86,14 +88,17 @@ monitor_resources() {
   trap "exit" SIGTERM
   while true; do
     TS=$(date +%s)
-    # Get top for all pods and filter later to be efficient, or try to filter here
-    # We filter by common names or just collect all and let the summary handle it
-    $KUBECTL_CMD top pod --no-headers 2>/dev/null >> "$RESOURCE_LOG.tmp" || true
-    while read -r line; do
-       if [ -n "$line" ]; then
-         echo "$TS,$line" | awk '{print $1 "," $2 "," $3 "," $4}' >> "$RESOURCE_LOG"
-       fi
-    done < "$RESOURCE_LOG.tmp"
+    # Ensure the tmp file exists to avoid "No such file" error
+    : > "$RESOURCE_LOG.tmp"
+    $KUBECTL_CMD top pod --no-headers 2>/dev/null > "$RESOURCE_LOG.tmp" || true
+    
+    if [ -s "$RESOURCE_LOG.tmp" ]; then
+      while read -r line; do
+         if [ -n "$line" ]; then
+           echo "$TS,$line" | awk '{print $1 "," $2 "," $3 "," $4}' >> "$RESOURCE_LOG"
+         fi
+      done < "$RESOURCE_LOG.tmp"
+    fi
     rm -f "$RESOURCE_LOG.tmp"
     sleep 5
   done
@@ -137,9 +142,9 @@ for RUN in $(seq 1 "$RUNS"); do
       PROGRESS_STEP=$(( TOTAL_REQUESTS / 10 ))
       [[ $PROGRESS_STEP -eq 0 ]] && PROGRESS_STEP=10
       if (( i % PROGRESS_STEP == 0 )); then
-        S_COUNT=$(ls -1 "$SUCCESS_DIR" | wc -l | xargs)
-        F_COUNT=$(ls -1 "$FAILURE_DIR" | wc -l | xargs)
-        echo "[Run $RUN] Progress: $i/$TOTAL_REQUESTS | Success: $S_COUNT | Failure: $F_COUNT | Target: $TARGET"
+        S_COUNT=$(ls -1 "$SUCCESS_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
+        F_COUNT=$(ls -1 "$FAILURE_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
+        echo "[Run $RUN] Progress: $i/$TOTAL_REQUESTS | Success(Run): $S_COUNT | Failure(Run): $F_COUNT | Target: $TARGET"
       fi
 
       PAYLOAD=${DATA_SET[$((i % ${#DATA_SET[@]}))]}
@@ -156,9 +161,9 @@ EOF
  
       (
         if curl -s --max-time 10 -X GET "$TARGET" > /dev/null 2>&1; then
-          increment "$SUCCESS_DIR"
+          increment "$SUCCESS_DIR" "$RUN"
         else
-          increment "$FAILURE_DIR"
+          increment "$FAILURE_DIR" "$RUN"
         fi
       ) &
  
@@ -207,8 +212,8 @@ END_TIME=$(date +%s)
 echo ""
 echo "=============================================="
 echo "ALL RUNS COMPLETED"
-echo "Success requests     : $(ls -1 "$SUCCESS_DIR" | wc -l | xargs)"
-echo "Failed requests      : $(ls -1 "$FAILURE_DIR" | wc -l | xargs)"
+echo "Success requests     : $(find "$SUCCESS_DIR" -type f | wc -l | xargs)"
+echo "Failed requests      : $(find "$FAILURE_DIR" -type f | wc -l | xargs)"
 echo "Total execution time : $((END_TIME - START_TIME))s"
 echo "=============================================="
  
