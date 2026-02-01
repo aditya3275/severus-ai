@@ -24,13 +24,13 @@
   "panels": [
     {
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 6,
         "x": 0,
         "y": 0
       },
       "id": 1,
-      "title": "Total App Logins",
+      "title": "Success Logins (Current session)",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -48,6 +48,7 @@
             "mode": "fixed",
             "fixedColor": "green"
           },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -66,13 +67,13 @@
     },
     {
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 6,
         "x": 6,
         "y": 0
       },
       "id": 2,
-      "title": "Messages Exchanged",
+      "title": "Messages Exchanged (Total)",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -88,20 +89,20 @@
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "blue"
+            "fixedColor": "light-blue"
           }
         }
       }
     },
     {
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 6,
         "x": 12,
         "y": 0
       },
       "id": 3,
-      "title": "AI Model Calls (Ollama)",
+      "title": "AI Logic Calls (Ollama)",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -124,13 +125,13 @@
     },
     {
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 6,
         "x": 18,
         "y": 0
       },
       "id": 4,
-      "title": "Current Replicas",
+      "title": "Active Pod Count",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -141,17 +142,33 @@
           "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"severus-ai\"}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "white",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "gridPos": {
-        "h": 12,
+        "h": 10,
         "w": 12,
         "x": 0,
-        "y": 4
+        "y": 5
       },
       "id": 5,
-      "title": "HPA Scaling Status (Current vs Desired Pods)",
+      "title": "HPA Scaling Status (Current vs Desired)",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -160,12 +177,12 @@
       "targets": [
         {
           "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"severus-ai\"}",
-          "legendFormat": "Actual Pods Running",
+          "legendFormat": "Actual Pods",
           "refId": "A"
         },
         {
           "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"severus-ai\"}",
-          "legendFormat": "HPA Goal Replicas",
+          "legendFormat": "HPA Target",
           "refId": "B"
         }
       ],
@@ -176,19 +193,19 @@
             "fillOpacity": 20,
             "lineWidth": 3
           },
-          "unit": "short"
+          "unit": "none"
         }
       }
     },
     {
       "gridPos": {
-        "h": 12,
+        "h": 10,
         "w": 12,
         "x": 12,
-        "y": 4
+        "y": 5
       },
       "id": 6,
-      "title": "System CPU Pressure (% vs HPA Target)",
+      "title": "CPU Usage (%) vs Autoscale Target",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -196,13 +213,13 @@
       },
       "targets": [
         {
-          "expr": "kube_horizontalpodautoscaler_status_target_metric{horizontalpodautoscaler=\"severus-ai\", metric_name=\"cpu\"} * 100",
+          "expr": "kube_horizontalpodautoscaler_status_target_metric{horizontalpodautoscaler=\"severus-ai\", metric_name=\"cpu\", metric_target_type=\"utilization\"}",
           "legendFormat": "Current Usage %",
           "refId": "A"
         },
         {
           "expr": "kube_horizontalpodautoscaler_spec_target_cpu_utilization_percentage{horizontalpodautoscaler=\"severus-ai\"}",
-          "legendFormat": "Scaling Threshold",
+          "legendFormat": "Autoscale Threshold (20%)",
           "refId": "B"
         }
       ],
@@ -225,7 +242,6 @@
   "schemaVersion": 39,
   "tags": [
     "severus-ai",
-    "monitoring",
     "metrics-only"
   ],
   "templating": {
@@ -237,8 +253,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Severus AI - Metrics Dashboard",
-  "uid": "severus-metrics-001",
+  "title": "Severus AI - Metrics Final v3",
+  "uid": "severus-metrics-v3",
   "version": 1,
   "weekStart": ""
 }
