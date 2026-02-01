@@ -137,17 +137,9 @@ for RUN in $(seq 1 "$RUNS"); do
  
   for TARGET in "${TARGETS[@]}"; do
     echo "Sending $TOTAL_REQUESTS requests to $TARGET"
+    LAST_LOGGED_STEP=0
  
     for i in $(seq 1 "$TOTAL_REQUESTS"); do
-      # Progress logging every 10% or at least every 100 requests
-      PROGRESS_STEP=$(( TOTAL_REQUESTS / 10 ))
-      [[ $PROGRESS_STEP -eq 0 ]] && PROGRESS_STEP=10
-      if (( i % PROGRESS_STEP == 0 )); then
-        S_COUNT=$(ls -1 "$SUCCESS_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
-        F_COUNT=$(ls -1 "$FAILURE_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
-        TOTAL_DONE=$((S_COUNT + F_COUNT))
-        echo "[Run $RUN] Progress: $i requests launched | $TOTAL_DONE requests finished | Success: $S_COUNT | Failure: $F_COUNT"
-      fi
 
       PAYLOAD=${DATA_SET[$((i % ${#DATA_SET[@]}))]}
  
@@ -169,6 +161,20 @@ EOF
         fi
       ) &
  
+      # Progress logging based on actual completions
+      PROGRESS_STEP=$(( TOTAL_REQUESTS / 10 ))
+      [[ $PROGRESS_STEP -eq 0 ]] && PROGRESS_STEP=10
+      
+      S_COUNT=$(ls -1 "$SUCCESS_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
+      F_COUNT=$(ls -1 "$FAILURE_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
+      TOTAL_DONE=$((S_COUNT + F_COUNT))
+      
+      CURRENT_STEP=$(( TOTAL_DONE / PROGRESS_STEP ))
+      if (( CURRENT_STEP > LAST_LOGGED_STEP )); then
+        echo "[Run $RUN] Progress: $((CURRENT_STEP * PROGRESS_STEP)) finished | Success: $S_COUNT | Failure: $F_COUNT"
+        LAST_LOGGED_STEP=$CURRENT_STEP
+      fi
+
       # Greedy concurrency control: keep the pipe full
       # We poll running jobs so we dont wait on a single slow request
       while [ $(jobs -r | wc -l) -ge "$CONCURRENCY" ]; do
