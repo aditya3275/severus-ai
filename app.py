@@ -19,15 +19,22 @@ from utils.ollama_client import chat_with_model
 # ======================================================
 from prometheus_client import start_http_server
 from metrics import MESSAGES_SENT
+import threading
 
-@st.cache_resource
-def start_metrics_server():
-    try:
-        start_http_server(8000)
-    except Exception:
-        pass # Port already in use usually (during st.rerun)
+def init_metrics():
+    if not hasattr(init_metrics, "started"):
+        try:
+            from prometheus_client import start_http_server
+            import threading
+            # Start in a background thread to avoid blocking Streamlit
+            t = threading.Thread(target=start_http_server, args=(8000, "0.0.0.0"), daemon=True)
+            t.start()
+            init_metrics.started = True
+            print("🚀 Prometheus metrics server started on port 8000")
+        except Exception as e:
+            print(f"⚠️ Failed to start metrics server: {e}")
 
-start_metrics_server()
+init_metrics()
 
 # ======================================================
 # APP CONFIG
