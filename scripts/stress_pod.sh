@@ -57,7 +57,6 @@ mkdir -p "$SUCCESS_DIR" "$FAILURE_DIR"
 increment() {
   local dir=$1
   local run_num=$2
-  mkdir -p "$dir/run_$run_num"
   mktemp -p "$dir/run_$run_num" "req.XXXXXX" > /dev/null
 }
 
@@ -132,6 +131,9 @@ for RUN in $(seq 1 "$RUNS"); do
   echo "----------------------------------------------"
  
   RUN_START=$(date +%s)
+  
+  # Prepare directories for this run
+  mkdir -p "$SUCCESS_DIR/run_$RUN" "$FAILURE_DIR/run_$RUN"
  
   for TARGET in "${TARGETS[@]}"; do
     echo "Sending $TOTAL_REQUESTS requests to $TARGET"
@@ -144,7 +146,8 @@ for RUN in $(seq 1 "$RUNS"); do
       if (( i % PROGRESS_STEP == 0 )); then
         S_COUNT=$(ls -1 "$SUCCESS_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
         F_COUNT=$(ls -1 "$FAILURE_DIR/run_$RUN" 2>/dev/null | wc -l | xargs)
-        echo "[Run $RUN] Progress: $i/$TOTAL_REQUESTS | Success(Run): $S_COUNT | Failure(Run): $F_COUNT | Target: $TARGET"
+        TOTAL_DONE=$((S_COUNT + F_COUNT))
+        echo "[Run $RUN] Progress: $i requests launched | $TOTAL_DONE requests finished | Success: $S_COUNT | Failure: $F_COUNT"
       fi
 
       PAYLOAD=${DATA_SET[$((i % ${#DATA_SET[@]}))]}
