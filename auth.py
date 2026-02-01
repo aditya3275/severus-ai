@@ -56,5 +56,7 @@ def login(username: str, password: str) -> bool:
             password
         ):
             logger.info(f"User logged in: {username}")
+            from metrics import LOGIN_COUNT
+            LOGIN_COUNT.inc()
             return True
     return False

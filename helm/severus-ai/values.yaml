@@ -58,3 +58,8 @@ autoscaling:
   minReplicas: 1
   maxReplicas: 5
   targetCPUUtilizationPercentage: 20
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus

@@ -20,6 +20,8 @@ def create_chat(username: str, title="New Chat"):
     conn.commit()
     conn.close()
     logger.info(f"Chat created: {chat_id} for {username}")
+    from metrics import CHAT_CREATED
+    CHAT_CREATED.inc()
     return chat_id
 
 

@@ -98,6 +98,8 @@ Uploaded document sources:
             json=payload,
             timeout=120,
         )
+        from metrics import OLLAMA_CALLS
+        OLLAMA_CALLS.inc()
 
         response.raise_for_status()
         return response.json()["message"]["content"]

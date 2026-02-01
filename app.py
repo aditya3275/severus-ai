@@ -15,6 +15,21 @@ from file_utils import save_uploaded_file, ensure_extracted_text
 from utils.ollama_client import chat_with_model
 
 # ======================================================
+# MONITORING (PROMETHEUS)
+# ======================================================
+from prometheus_client import start_http_server
+from metrics import MESSAGES_SENT
+
+@st.cache_resource
+def start_metrics_server():
+    try:
+        start_http_server(8000)
+    except Exception:
+        pass # Port already in use usually (during st.rerun)
+
+start_metrics_server()
+
+# ======================================================
 # APP CONFIG
 # ======================================================
 st.set_page_config(
@@ -228,6 +243,7 @@ else:
 
     if user_input:
         save_message(chat_id, "user", user_input)
+        MESSAGES_SENT.inc()
 
         reply = chat_with_model(
             "gemma3:1b",
