@@ -22,6 +22,9 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
 
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}

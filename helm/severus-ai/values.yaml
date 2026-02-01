@@ -31,10 +31,10 @@ performanceTest:
     - "http://severus-ai.local"
   
   # Load parameters
-  totalRequests: 100        # Total HTTP requests per run
-  concurrency: 5            # Number of concurrent requests
-  runs: 1                   # Number of test runs
-  sleepBetweenRuns: 0       # Sleep duration between runs (seconds)
+  totalRequests: 1000        # Increased for better stress testing
+  concurrency: 20           # Increased for better stress testing
+  runs: 5                   # Increased for better stress testing
+  sleepBetweenRuns: 2       # Small sleep
   
   # Pod validation
   podLabels:
@@ -44,3 +44,17 @@ performanceTest:
   thresholds:
     maxCpuMillicores: 1000  # Maximum acceptable CPU usage (millicores)
     maxMemoryMiB: 512       # Maximum acceptable memory usage (MiB)
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 50
