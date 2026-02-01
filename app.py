@@ -230,6 +230,9 @@ else:
 
                 save_message(chat_id, "assistant", reply)
 
+            except Exception as e:
+                APP_ERRORS.inc()
+                st.error(f"Error summarising: {e}")
             st.rerun()
 
         st.markdown(
