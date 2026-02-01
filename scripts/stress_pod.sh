@@ -56,10 +56,7 @@ mkdir -p "$SUCCESS_DIR" "$FAILURE_DIR"
 
 increment() {
   local dir=$1
-  local i=0
-  # Create a unique file for each success/failure to avoid race conditions
-  # We use a random suffix plus increment to ensure uniqueness even in parallel
-  touch "$dir/req_$(date +%N)_$RANDOM"
+  mktemp -p "$dir" "req.XXXXXX" > /dev/null
 }
 
 cleanup_results() {
@@ -136,6 +133,15 @@ for RUN in $(seq 1 "$RUNS"); do
     PIDS=()
  
     for i in $(seq 1 "$TOTAL_REQUESTS"); do
+      # Progress logging every 10% or at least every 100 requests
+      PROGRESS_STEP=$(( TOTAL_REQUESTS / 10 ))
+      [[ $PROGRESS_STEP -eq 0 ]] && PROGRESS_STEP=10
+      if (( i % PROGRESS_STEP == 0 )); then
+        S_COUNT=$(ls -1 "$SUCCESS_DIR" | wc -l | xargs)
+        F_COUNT=$(ls -1 "$FAILURE_DIR" | wc -l | xargs)
+        echo "[Run $RUN] Progress: $i/$TOTAL_REQUESTS | Success: $S_COUNT | Failure: $F_COUNT | Target: $TARGET"
+      fi
+
       PAYLOAD=${DATA_SET[$((i % ${#DATA_SET[@]}))]}
  
       REQUEST_BODY=$(cat <<EOF
