@@ -176,16 +176,24 @@ EOF
       fi
 
       # Greedy concurrency control: keep the pipe full
-      # We poll running jobs so we dont wait on a single slow request
       while [ $(jobs -r | wc -l) -ge "$CONCURRENCY" ]; do
         sleep 0.05
       done
     done
  
-    # CRITICAL: Wait for ALL remaining background processes
-    echo "Waiting for remaining requests to complete..."
-    wait
-    echo "All requests completed for $TARGET"
+    # Wait for the remaining requests with a timeout to avoid hangs
+    echo "Waiting up to 30s for the remaining batch to complete..."
+    for t in $(seq 1 30); do
+      RUNNING_JOBS=$(jobs -r | wc -l)
+      if [ "$RUNNING_JOBS" -eq 0 ]; then break; fi
+      sleep 1
+    done
+    # Kill any truly stuck requests so we can proceed to the next run
+    if [ $(jobs -r | wc -l) -gt 0 ]; then
+       echo "Warning: Some requests are taking too long. Terminating them to proceed."
+       kill $(jobs -p) 2>/dev/null || true
+    fi
+    echo "Run $RUN batch completed for $TARGET"
   done
  
   RUN_END=$(date +%s)
