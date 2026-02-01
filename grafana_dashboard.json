@@ -1,19 +1,6 @@
 {
   "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Graphics --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
+    "list": []
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -23,14 +10,26 @@
   "liveNow": true,
   "panels": [
     {
+      "collapsed": false,
       "gridPos": {
-        "h": 5,
-        "w": 6,
+        "h": 1,
+        "w": 24,
         "x": 0,
         "y": 0
       },
+      "id": 100,
+      "title": "1. Product Health",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
-      "title": "Success Logins (Current session)",
+      "title": "Success Logins",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -47,33 +46,19 @@
           "color": {
             "mode": "fixed",
             "fixedColor": "green"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
           }
         }
-      },
-      "options": {
-        "textMode": "value_and_name",
-        "graphMode": "area"
       }
     },
     {
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 6,
-        "y": 0
+        "y": 1
       },
       "id": 2,
-      "title": "Messages Exchanged (Total)",
+      "title": "Messages Exchanged",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -89,20 +74,62 @@
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "light-blue"
+            "fixedColor": "blue"
           }
         }
       }
     },
     {
       "gridPos": {
-        "h": 5,
-        "w": 6,
+        "h": 4,
+        "w": 12,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 3,
-      "title": "AI Logic Calls (Ollama)",
+      "title": "Requests / sec",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(request_count_total[1m]))",
+          "legendFormat": "Req/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line"
+          },
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 200,
+      "title": "2. AI System (Model Performance)",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "id": 10,
+      "title": "AI Logic Calls (Total)",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -125,12 +152,92 @@
     },
     {
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 0
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 6
       },
-      "id": 4,
+      "id": 11,
+      "title": "AI Latency (Avg)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(ai_latency_seconds_sum[1m])) / sum(rate(ai_latency_seconds_count[1m]))",
+          "legendFormat": "Avg Latency",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "id": 12,
+      "title": "AI Errors",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(ai_errors_total) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 300,
+      "title": "3. Kubernetes & Scaling",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 13
+      },
+      "id": 20,
       "title": "Active Pod Count",
       "type": "stat",
       "datasource": {
@@ -142,33 +249,17 @@
           "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"severus-ai\"}",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "white",
-                "value": null
-              }
-            ]
-          }
-        }
-      }
+      ]
     },
     {
       "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 5
+        "h": 6,
+        "w": 16,
+        "x": 8,
+        "y": 13
       },
-      "id": 5,
-      "title": "HPA Scaling Status (Current vs Desired)",
+      "id": 21,
+      "title": "HPA Desired vs Current",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -177,35 +268,32 @@
       "targets": [
         {
           "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"severus-ai\"}",
-          "legendFormat": "Actual Pods",
+          "legendFormat": "Actual",
           "refId": "A"
         },
         {
           "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"severus-ai\"}",
-          "legendFormat": "HPA Target",
+          "legendFormat": "Desired",
           "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "drawStyle": "stepAfter",
-            "fillOpacity": 20,
-            "lineWidth": 3
-          },
-          "unit": "none"
+            "drawStyle": "stepAfter"
+          }
         }
       }
     },
     {
       "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 5
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 19
       },
-      "id": 6,
-      "title": "CPU Usage (%) vs Autoscale Target",
+      "id": 22,
+      "title": "CPU & Memory vs Targets",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -214,27 +302,152 @@
       "targets": [
         {
           "expr": "kube_horizontalpodautoscaler_status_target_metric{horizontalpodautoscaler=\"severus-ai\", metric_name=\"cpu\", metric_target_type=\"utilization\"}",
-          "legendFormat": "Current Usage %",
+          "legendFormat": "CPU Usage %",
           "refId": "A"
         },
         {
           "expr": "kube_horizontalpodautoscaler_spec_target_cpu_utilization_percentage{horizontalpodautoscaler=\"severus-ai\"}",
-          "legendFormat": "Autoscale Threshold (20%)",
+          "legendFormat": "CPU Trigger (20%)",
           "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2
-          },
           "min": 0,
           "max": 100
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 400,
+      "title": "4. Reliability (SLOs & Error Rates)",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "id": 30,
+      "title": "Request Latency (P50 / P95 / P99)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(request_latency_seconds_bucket[5m])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(request_latency_seconds_bucket[5m])))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(request_latency_seconds_bucket[5m])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 28
+      },
+      "id": 31,
+      "title": "Error Rate (%)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(app_errors_total[5m])) / sum(rate(request_count_total[5m])) * 100 or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 28
+      },
+      "id": 32,
+      "title": "Pod Restarts",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(changes(kube_pod_container_status_restarts_total{container=\"severus-ai\"}[1h]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
         }
       }
     }
@@ -242,7 +455,7 @@
   "schemaVersion": 39,
   "tags": [
     "severus-ai",
-    "metrics-only"
+    "full-stack-monitoring"
   ],
   "templating": {
     "list": []
@@ -251,10 +464,7 @@
     "from": "now-30m",
     "to": "now"
   },
-  "timepicker": {},
-  "timezone": "browser",
-  "title": "Severus AI - Metrics Final v3",
-  "uid": "severus-metrics-v3",
-  "version": 1,
-  "weekStart": ""
+  "title": "Severus AI - Command Center",
+  "uid": "severus-command-center",
+  "version": 1
 }

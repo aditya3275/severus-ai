@@ -1,14 +1,18 @@
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 
-LOGIN_COUNT = Counter("login_total", "Total logins")
-CHAT_CREATED = Counter("chat_created_total", "Chats created")
-MESSAGES_SENT = Counter("messages_sent_total", "Messages sent")
-OLLAMA_CALLS = Counter("ollama_calls_total", "Ollama calls")
+# --- Product Health ---
+LOGIN_TOTAL = Counter("login_total", "Total logins")
+CHAT_CREATED = Counter("chat_created_total", "Total chats created")
+MESSAGES_SENT = Counter("messages_sent_total", "Total messages sent")
+REQUEST_COUNT = Counter("request_count_total", "Total application requests")
+REQUEST_LATENCY = Histogram("request_latency_seconds", "Application request latency")
 
-if __name__ == "__main__":
-    from prometheus_client import start_http_server
-    import time
-    start_http_server(8000)
-    print("🚀 Prometheus metrics server started on port 8000")
-    while True:
-        time.sleep(3600)
+# --- AI System ---
+OLLAMA_CALLS = Counter("ollama_calls_total", "Total Ollama calls")
+AI_LATENCY = Histogram("ai_latency_seconds", "AI model response latency")
+AI_ERRORS = Counter("ai_errors_total", "Total AI model errors")
+
+# --- Reliability ---
+APP_ERRORS = Counter("app_errors_total", "Total application-level errors")
+
+# Counters are imported and used by app.py

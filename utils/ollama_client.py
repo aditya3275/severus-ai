@@ -2,6 +2,7 @@ import requests
 from pathlib import Path
 import logging
 import os
+import time
 
 # =========================
 # OLLAMA CONFIG (AUTO)
@@ -90,7 +91,9 @@ Uploaded document sources:
     }
 
     # ---------- SEND TO OLLAMA ----------
+    ai_start = time.time()
     try:
+        from metrics import OLLAMA_CALLS, AI_LATENCY, AI_ERRORS
         logger.info(f"Sending request to Ollama @ {OLLAMA_BASE_URL}")
 
         response = requests.post(
@@ -98,12 +101,14 @@ Uploaded document sources:
             json=payload,
             timeout=120,
         )
-        from metrics import OLLAMA_CALLS
         OLLAMA_CALLS.inc()
+        AI_LATENCY.observe(time.time() - ai_start)
 
         response.raise_for_status()
         return response.json()["message"]["content"]
 
     except Exception as e:
+        from metrics import AI_ERRORS
+        AI_ERRORS.inc()
         logger.error(f"Ollama error: {e}")
         return "⚠️ Error communicating with Ollama. Is Ollama running?"

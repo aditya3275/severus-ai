@@ -14,19 +14,14 @@ from chat import (
 from file_utils import save_uploaded_file, ensure_extracted_text
 from utils.ollama_client import chat_with_model
 
-# ======================================================
-# MONITORING (PROMETHEUS)
-# ======================================================
-from prometheus_client import start_http_server
-from metrics import MESSAGES_SENT
-import threading
+import time
+from metrics import MESSAGES_SENT, REQUEST_COUNT, REQUEST_LATENCY, APP_ERRORS, LOGIN_TOTAL
 
 def init_metrics():
     if not hasattr(init_metrics, "started"):
         try:
             from prometheus_client import start_http_server
             import threading
-            # Start in a background thread to avoid blocking Streamlit
             t = threading.Thread(target=start_http_server, args=(8000, "0.0.0.0"), daemon=True)
             t.start()
             init_metrics.started = True
@@ -35,6 +30,10 @@ def init_metrics():
             print(f"⚠️ Failed to start metrics server: {e}")
 
 init_metrics()
+
+# Track start of request
+start_time = time.time()
+REQUEST_COUNT.inc()
 
 # ======================================================
 # APP CONFIG
@@ -88,6 +87,7 @@ if not st.session_state.authenticated:
                     st.session_state.username = u
                     st.rerun()
                 else:
+                    APP_ERRORS.inc()
                     st.error("Invalid credentials")
 
         with tab2:
@@ -97,6 +97,7 @@ if not st.session_state.authenticated:
                 if signup(u, p):
                     st.success("Account created. Login now.")
                 else:
+                    APP_ERRORS.inc()
                     st.error("Username already exists")
 
 # ======================================================
@@ -214,8 +215,9 @@ else:
     # -------- SUMMARIZE BUTTON (LAZY & FAST) --------
     if st.session_state.has_document.get(chat_id):
         if st.button("📄 Summarize Uploaded Document", use_container_width=True):
-            with st.spinner("Reading and summarizing document..."):
-                ensure_extracted_text(chat_id)
+            try:
+                with st.spinner("Reading and summarizing document..."):
+                    ensure_extracted_text(chat_id)
 
                 prompt = "Summarize the uploaded document clearly and concisely."
                 save_message(chat_id, "user", prompt)
@@ -260,3 +262,6 @@ else:
 
         save_message(chat_id, "assistant", reply)
         st.rerun()
+
+# Observe latency at the end of the execution loop
+REQUEST_LATENCY.observe(time.time() - start_time)
