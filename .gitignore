@@ -17,3 +17,7 @@ instrctions.txt
 
 # One-off recovery files
 fluent-bit-config-fixed.yaml
+
+# AI Debugger Logs
+jenkins_console.log
+ai_debug_report.txt
