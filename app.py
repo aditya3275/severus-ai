@@ -21,7 +21,7 @@ def init_metrics():
     if not hasattr(init_metrics, "started"):
         try:
             from prometheus_client import start_http_server
-            impor threading
+            import threading
             t = threading.Thread(target=start_http_server, args=(8000, "0.0.0.0"), daemon=True)
             t.start()
             init_metrics.started = True
