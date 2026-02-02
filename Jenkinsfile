@@ -84,7 +84,7 @@ pipeline {
 
         /* ================= SECURITY ================= */
 
-        stage('Trivy Security Scan') {
+        stag('Trivy Security Scan') {
             steps {
                 sh '''
                     echo "🔐 Running Trivy scan..."
