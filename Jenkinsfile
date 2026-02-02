@@ -352,4 +352,32 @@ pipeline {
             }
         }
     }
+    
+    post {
+        failure {
+            script {
+                echo "❌ Pipeline failed. Invoking AI Debugger..."
+                
+                // Fetch console logs
+                // Note: currentBuild.rawBuild.getLog(1000) requires script approval or specialized plugins.
+                // A common alternative is using the Jenkins API or a simple redirection if logs are local.
+                // Here we assume the workspace logic can access the console output if we pipe it or use a plugin.
+                // For simplicity in this environment, we'll try to use the Jenkins console log URL or a mock log if needed.
+                
+                sh """
+                    echo "🔍 Fetching console logs for analysis..."
+                    curl -u \${DB_CREDS} \${BUILD_URL}consoleText > jenkins_console.log || echo "Warning: Could not fetch console logs via API"
+                    
+                    # Run the AI Debugger
+                    \$PYTHON_BIN scripts/jenkins_ai_debugger.py \\
+                        --repo-path . \\
+                        --log-path jenkins_console.log \\
+                        --output-path ai_debug_report.txt \\
+                        --status failure
+                """
+                
+                archiveArtifacts artifacts: 'ai_debug_report.txt', fingerprint: true, allowEmptyArchive: true
+            }
+        }
+    }
 }
