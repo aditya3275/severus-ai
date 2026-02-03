@@ -80,6 +80,10 @@ def extract_runtime_error(log_text):
         r'SyntaxError:.*?(\w+)',
         r'AttributeError:.*?object has no attribute \'(\w+)\'',
         r'Exception: (.+)',
+        r'Error: UPGRADE FAILED: .*? (no matches for kind "(\w+)")',
+        r'Error: UPGRADE FAILED: .*? (resource mapping not found for name: "([\w-]+)")',
+        r'error: (\w+) is not a valid resource type',
+        r'(\w+): Permission denied',
     ]
 
     for pattern in patterns:

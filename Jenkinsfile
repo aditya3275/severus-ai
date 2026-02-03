@@ -385,6 +385,12 @@ pipeline {
                             --log-path jenkins_console.log \\
                             --output-path ai_debug_report.txt \\
                             --status failure
+                        
+                        echo "================================================================================"
+                        echo "📄 AI DEBUGGER REPORT SUMMARY"
+                        echo "================================================================================"
+                        cat ai_debug_report.txt || echo "AI Debugger report not found"
+                        echo "================================================================================"
                     """
                 }
                 
