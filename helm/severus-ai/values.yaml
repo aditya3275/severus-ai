@@ -32,9 +32,9 @@ performanceTest:
     - "http://severus-ai.local"
   
   # Load parameters
-  totalRequests: 300        # Total requests
+  totalRequests: 2000        # Total requests
   concurrency: 50       # SEND ALL AT ONCE
-  runs: 3                 # Single massive burst
+  runs: 2                 # Single massive burst
   sleepBetweenRuns: 2       # Small sleep
   
   # Pod validation
