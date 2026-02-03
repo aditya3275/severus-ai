@@ -7,9 +7,12 @@ import time
 # =========================
 # OLLAMA CONFIG (AUTO)
 # =========================
-OLLAMA_BASE_URL = os.getenv(
-    "OLLAMA_BASE_URL", "http://ollama:11434"  # ✅ Kubernetes Service DNS (default)
-)
+try:
+    from config.settings import OLLAMA_BASE_URL
+except ImportError:
+    OLLAMA_BASE_URL = os.getenv(
+        "OLLAMA_BASE_URL", "http://localhost:11434"
+    )
 
 logger = logging.getLogger("ollama-client")
 

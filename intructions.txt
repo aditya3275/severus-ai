@@ -77,20 +77,7 @@ is NOT application-specific
 must never re-run on every CI build
 
 architecture
-Severus AI Pods
-   │
-   └─ stdout logs
-        │
-        ▼
-Fluent Bit (DaemonSet)
-        │
-        ▼
-OpenSearch (log storage + search)
-        │
-        ▼
-Grafana (visualization, dashboards, alerts)
 
-Deploy OpenSearch
 helm repo add opensearch https://opensearch-project.github.io/helm-charts
 helm install opensearch opensearch/opensearch \
   -n observability --create-namespace
