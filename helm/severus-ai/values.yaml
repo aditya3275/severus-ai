@@ -12,6 +12,7 @@ service:
 ingress:
   enabled: true
   className: traefik
+  host: severus-ai.local
   hosts:
     - host: severus-ai.local
       paths:

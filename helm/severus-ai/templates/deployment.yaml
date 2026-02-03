@@ -31,7 +31,21 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
 
           env:
+            - name: TLS_CERT_PATH
+              value: "/etc/tls/tls.crt"
+            - name: TLS_KEY_PATH
+              value: "/etc/tls/tls.key"
+            - name: CA_CERT_PATH
+              value: "/etc/tls/ca.crt"
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+          volumeMounts:
+            - name: tls-certs
+              mountPath: "/etc/tls"
+              readOnly: true
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: {{ include "severus-ai.fullname" . }}-tls-secret

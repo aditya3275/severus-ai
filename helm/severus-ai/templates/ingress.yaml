@@ -3,10 +3,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "severus-ai.fullname" . }}
+  annotations:
+    cert-manager.io/cluster-issuer: "local-ca-issuer"
+    traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ include "severus-ai.fullname" . }}-ingress-tls
   rules:
-    - host: severus-ai.local
+    - host: {{ .Values.ingress.host }}
       http:
         paths:
           - path: /
