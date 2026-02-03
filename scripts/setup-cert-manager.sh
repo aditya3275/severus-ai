@@ -7,8 +7,8 @@ echo "🚀 Adding Jetstack Helm repository..."
 helm repo add jetstack https://charts.jetstack.io
 helm repo update
 
-echo "📦 Installing cert-manager v1.14.4..."
-helm install cert-manager jetstack/cert-manager \
+echo "📦 Installing/Upgrading cert-manager v1.14.4..."
+helm upgrade --install cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
   --version v1.14.4 \

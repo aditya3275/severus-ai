@@ -125,6 +125,17 @@ pipeline {
             }
         }
 
+        /* ================= INFRASTRUCTURE ================= */
+
+        stage('Setup Infrastructure') {
+            steps {
+                sh '''
+                    echo "🛠️ Setting up cluster infrastructure (cert-manager)..."
+                    bash scripts/setup-cert-manager.sh
+                '''
+            }
+        }
+
         /* ================= DEPLOY ================= */
 
         stage('Deploy to Kubernetes (Ingress via Helm)') {
