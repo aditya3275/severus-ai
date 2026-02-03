@@ -168,8 +168,15 @@ pipeline {
                     steps {
                         sh '''
                             echo "🌐 Testing Ingress reachability..."
-                            curl --fail http://severus-ai.local
-                            echo "✅ Ingress reachable"
+                            # Try HTTP first, then HTTPS (with -k for local CA)
+                            if curl --fail -s http://severus-ai.local; then
+                                echo "✅ Ingress reachable via HTTP"
+                            elif curl --fail -s -k https://severus-ai.local; then
+                                echo "✅ Ingress reachable via HTTPS (self-signed cert)"
+                            else
+                                echo "❌ Ingress unreachable"
+                                exit 1
+                            fi
                         '''
                     }
                 }

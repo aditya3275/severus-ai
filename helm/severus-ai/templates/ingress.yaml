@@ -5,7 +5,7 @@ metadata:
   name: {{ include "severus-ai.fullname" . }}
   annotations:
     cert-manager.io/cluster-issuer: "local-ca-issuer"
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Removed forcing TLS annotation to allow baseline HTTP reachability tests
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:
