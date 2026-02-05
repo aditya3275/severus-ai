@@ -248,7 +248,7 @@ fi
 # AI-POWERED COST ANALYSIS (Ollama)
 # -----------------------------
 OLLAMA_API="${OLLAMA_API:-http://localhost:11434}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:1b}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-deepseek-v3.1:671b-cloud}"
 
 analyze_with_ollama() {
   echo ""
