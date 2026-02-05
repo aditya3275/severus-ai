@@ -5,6 +5,14 @@
 HELM=${HELM_BIN:-helm}
 KUBECTL=${KUBECTL_BIN:-kubectl}
 
+VALIDATE_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --validate) VALIDATE_ONLY=1; shift ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
+
 set -e
 
 # Colors for output
@@ -23,9 +31,10 @@ print_status() {
     fi
 }
 
-# =====================================================
-# STEP 1: Install cert-manager
-# =====================================================
+if [ $VALIDATE_ONLY -eq 1 ]; then
+    echo "🔍 Validation-only mode enabled. Skipping installation steps..."
+    # Go directly to STEP 4
+else
 echo ""
 echo "========================================"
 echo "STEP 1: Installing cert-manager"
@@ -161,6 +170,7 @@ sleep 3
 $KUBECTL wait --for=condition=ready certificate/severus-ai-tls -n default --timeout=120s
 
 print_status "Application certificates created!" "success"
+fi
 
 # =====================================================
 # STEP 4: Validate Certificates

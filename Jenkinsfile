@@ -125,13 +125,20 @@ pipeline {
             }
         }
 
-        /* ================= INFRASTRUCTURE ================= */
-
         stage('Setup Infrastructure') {
             steps {
                 sh '''
                     echo "🛠️ Setting up cluster infrastructure (cert-manager)..."
                     bash scripts/setup-cert-manager.sh
+                '''
+            }
+        }
+
+        stage('Verify Certificates') {
+            steps {
+                sh '''
+                    echo "🔍 Verifying cert-manager and certificates..."
+                    bash scripts/setup-cert-manager.sh --validate
                 '''
             }
         }
