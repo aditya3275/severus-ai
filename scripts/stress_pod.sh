@@ -289,40 +289,76 @@ analyze_with_ollama() {
   fi
   
   # Extract peak metrics from resource log
+  local TOTAL_PEAK_CPU=0
+  local TOTAL_PEAK_MEM=0
   if [[ -f "$RESOURCE_LOG" && $(wc -l <"$RESOURCE_LOG") -gt 1 ]]; then
     PEAK_CPU_LIST=$(awk -F',' 'NR>1 && $3 ~ /[0-9]/ {print $2 ": " $3}' "$RESOURCE_LOG" | sort -t: -k2 -rn | head -5 | tr '\n' '; ')
     PEAK_MEM_LIST=$(awk -F',' 'NR>1 && $4 ~ /[0-9]/ {print $2 ": " $4}' "$RESOURCE_LOG" | sort -t: -k2 -rn | head -5 | tr '\n' '; ')
+    
+    # Calculate aggregate peaks for scaling math
+    TOTAL_PEAK_CPU=$(awk -F',' 'NR>1 {cpu[$2] = (cpu[$2] > $3 ? cpu[$2] : $3)} END {for (p in cpu) sum += cpu[p]; print sum}' "$RESOURCE_LOG")
+    TOTAL_PEAK_MEM=$(awk -F',' 'NR>1 {mem[$2] = (mem[$2] > $4 ? mem[$2] : $4)} END {for (p in mem) sum += mem[p]; print sum}' "$RESOURCE_LOG")
   fi
+
+  # =====================================================
+  # MATHEMATICAL SCALING CALCULATIONS
+  # =====================================================
+  local TARGET_CPU_UTIL=50 # Target 50% utilization
+  local IDEAL_POD_COUNT=$POD_COUNT
+  local CPU_REQ_RECOMMENDED="N/A"
+  local CPU_LIM_RECOMMENDED="N/A"
+  local MEM_REQ_RECOMMENDED="N/A"
+  local MEM_LIM_RECOMMENDED="N/A"
+  local COST_SAVINGS_PERCENT=0
   
+  if [[ $POD_COUNT -gt 0 && $TOTAL_PEAK_CPU -gt 0 ]]; then
+    # Calculate Ideal Pods: (Total Peak CPU / Target Utilization)
+    # Using awk for floating point and ceil logic
+    IDEAL_POD_COUNT=$(awk -v total_cpu="$TOTAL_PEAK_CPU" -v target="$TARGET_CPU_UTIL" 'BEGIN {print int((total_cpu/target) + 0.99)}')
+    [[ $IDEAL_POD_COUNT -lt 1 ]] && IDEAL_POD_COUNT=1
+    
+    # Calculate Resources per Pod (Current workload intensity)
+    local CPU_PER_POD=$(awk -v total_cpu="$TOTAL_PEAK_CPU" -v pods="$POD_COUNT" 'BEGIN {print total_cpu/pods}')
+    local MEM_PER_POD=$(awk -v total_mem="$TOTAL_PEAK_MEM" -v pods="$POD_COUNT" 'BEGIN {print total_mem/pods}')
+    
+    # Recommendations with headroom: 20% for Request, 50% for Limit
+    CPU_REQ_RECOMMENDED=$(awk -v cpu="$CPU_PER_POD" 'BEGIN {printf "%.0fm", cpu * 1.2}')
+    CPU_LIM_RECOMMENDED=$(awk -v cpu="$CPU_PER_POD" 'BEGIN {printf "%.0fm", cpu * 1.5}')
+    MEM_REQ_RECOMMENDED=$(awk -v mem="$MEM_PER_POD" 'BEGIN {printf "%.0fMi", mem * 1.2}')
+    MEM_LIM_RECOMMENDED=$(awk -v mem="$MEM_PER_POD" 'BEGIN {printf "%.0fMi", mem * 1.5}')
+    
+    # Calculate Savings: ((Current - Ideal) / Current) * 100
+    COST_SAVINGS_PERCENT=$(awk -v cur="$POD_COUNT" -v ideal="$IDEAL_POD_COUNT" 'BEGIN {printf "%.1f", ((cur - ideal) / cur) * 100}')
+  fi
+
   # Build the prompt
-  local PROMPT="You are a Kubernetes scaling expert. Based on these metrics, provide ONLY scaling recommendations and cost analysis.
+  local PROMPT="You are a Kubernetes scaling expert. I have performed mathematical scaling calculations based on stress test metrics. 
+Summarize these results and explain the reasoning.
 
-METRICS:
+CALCULATED METRICS:
 - Requests: $TOTAL_COUNT total, $FAILURE_COUNT failed (${SUCCESS_RATE}% success)
-- Duration: ${DURATION}s | Throughput: ${THROUGHPUT} req/s
-- Concurrency: $CONCURRENCY
-- Current Pods: $POD_COUNT
-- Peak CPU: ${PEAK_CPU_LIST:-N/A}
-- Peak Memory: ${PEAK_MEM_LIST:-N/A}
+- Throughput: ${THROUGHPUT} req/s
+- Current State: $POD_COUNT pods | Peak CPU: $TOTAL_PEAK_CPU m | Peak Mem: $TOTAL_PEAK_MEM Mi
+- Missed Requests: $FAILURE_COUNT
 
-Provide ONLY the following (be concise, use numbers):
+DETERMINISTIC RECOMMENDATIONS (Use these in your report):
+1. HORIZONTAL SCALING:
+   - Recommended: $IDEAL_POD_COUNT pods (Targeting ${TARGET_CPU_UTIL}% CPU utilization)
+   - Estimated Savings: ${COST_SAVINGS_PERCENT}%
 
-1. MISSED REQUESTS: Did we miss/fail any requests? If yes, why? (1 line)
+2. VERTICAL SCALING:
+   - CPU Request/Limit: $CPU_REQ_RECOMMENDED / $CPU_LIM_RECOMMENDED
+   - Memory Request/Limit: $MEM_REQ_RECOMMENDED / $MEM_LIM_RECOMMENDED
 
-2. HORIZONTAL SCALING (Pod Count):
-   - Current: $POD_COUNT pods
-   - Recommended: [number] pods
-   - Reason: [1 line]
+Write a concise report following this structure:
+1. MISSED REQUESTS: Analysis of failures.
+2. HORIZONTAL SCALING: Recommendation based on the calculated $IDEAL_POD_COUNT pods.
+3. VERTICAL SCALING: Justify the resource recommendations.
+4. ESTIMATED SAVINGS: Explain the ${COST_SAVINGS_PERCENT}% savings/cost impact.
 
-3. VERTICAL SCALING (Resources per Pod):
-   - CPU Request/Limit: [recommended values like 100m/500m]
-   - Memory Request/Limit: [recommended values like 128Mi/512Mi]
+Monthly cost estimate: Assuming \$0.05/pod/hour, current cost is \$$(awk -v p="$POD_COUNT" 'BEGIN {printf "%.2f", p * 0.05 * 24 * 30}') vs optimized \$$(awk -v p="$IDEAL_POD_COUNT" 'BEGIN {printf "%.2f", p * 0.05 * 24 * 30}').
 
-4. ESTIMATED SAVINGS:
-   - If using recommended settings: [X]% cost reduction
-   - Monthly estimate: Assuming \$0.05/pod/hour, current cost vs optimized cost
-
-Keep each section to 2-3 lines max. No disclaimers."
+Keep it professional and data-driven. No disclaimers or filler."
 
   # Escape the prompt for JSON
   local ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs .)
