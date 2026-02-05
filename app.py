@@ -46,6 +46,9 @@ st.set_page_config(
 
 init_db()
 
+# Load model name from environment
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b")
+
 # ======================================================
 # SESSION STATE (MINIMAL & SAFE)
 # ======================================================
@@ -223,7 +226,7 @@ else:
                 save_message(chat_id, "user", prompt)
 
                 reply = chat_with_model(
-                    "gemma3:1b",
+                    OLLAMA_MODEL,
                     get_messages(chat_id) + [("user", prompt)],
                     chat_id=chat_id,
                 )
@@ -258,7 +261,7 @@ else:
         MESSAGES_SENT.inc()
 
         reply = chat_with_model(
-            "gemma3:1b",
+            OLLAMA_MODEL,
             get_messages(chat_id) + [("user", user_input)],
             chat_id=chat_id,
         )

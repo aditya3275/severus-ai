@@ -1,7 +1,7 @@
 import os
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-DEFAULT_MODEL = "gemma3:1b"
+DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b")
 
 
 APP_NAME = "Ollama Streamlit Chat"

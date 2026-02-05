@@ -21,6 +21,7 @@ ingress:
 
 env:
   OLLAMA_BASE_URL: "http://host.k3d.internal:11434"
+  OLLAMA_MODEL: "deepseek-v3.1:671b-cloud"
 
 # Performance Testing Configuration
 performanceTest:
