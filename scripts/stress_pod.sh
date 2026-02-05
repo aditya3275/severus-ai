@@ -243,6 +243,134 @@ else
     }
   }' "$RESOURCE_LOG"
 fi
+
+# -----------------------------
+# AI-POWERED COST ANALYSIS (Ollama)
+# -----------------------------
+OLLAMA_API="${OLLAMA_API:-http://localhost:11434}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:1b}"
+
+analyze_with_ollama() {
+  echo ""
+  echo "=============================================="
+  echo "🤖 AI COST OPTIMIZATION ANALYSIS (Ollama)"
+  echo "=============================================="
+  
+  # Check if Ollama is available
+  if ! curl -s --max-time 3 "$OLLAMA_API/api/tags" > /dev/null 2>&1; then
+    echo "⚠️  Ollama not available at $OLLAMA_API - skipping AI analysis"
+    echo "   To enable: start Ollama with 'ollama serve'"
+    return 0
+  fi
+  
+  # Collect metrics for analysis
+  local SUCCESS_COUNT=$(find "$SUCCESS_DIR" -type f 2>/dev/null | wc -l | xargs)
+  local FAILURE_COUNT=$(find "$FAILURE_DIR" -type f 2>/dev/null | wc -l | xargs)
+  local TOTAL_COUNT=$((SUCCESS_COUNT + FAILURE_COUNT))
+  local SUCCESS_RATE=0
+  [[ $TOTAL_COUNT -gt 0 ]] && SUCCESS_RATE=$((SUCCESS_COUNT * 100 / TOTAL_COUNT))
+  
+  local DURATION=$((END_TIME - START_TIME))
+  local THROUGHPUT=0
+  [[ $DURATION -gt 0 ]] && THROUGHPUT=$((TOTAL_COUNT / DURATION))
+  
+  # Get pod count and resource metrics
+  local POD_COUNT=0
+  local PEAK_CPU_LIST=""
+  local PEAK_MEM_LIST=""
+  
+  if [[ ${#POD_LABELS[@]} -gt 0 ]]; then
+    for LABEL in "${POD_LABELS[@]}"; do
+      local COUNT=$($KUBECTL_CMD get pods -l "$LABEL" --field-selector=status.phase=Running -o name 2>/dev/null | wc -l | xargs)
+      POD_COUNT=$((POD_COUNT + COUNT))
+    done
+  else
+    POD_COUNT=$($KUBECTL_CMD get pods --field-selector=status.phase=Running -o name 2>/dev/null | wc -l | xargs)
+  fi
+  
+  # Extract peak metrics from resource log
+  if [[ -f "$RESOURCE_LOG" && $(wc -l <"$RESOURCE_LOG") -gt 1 ]]; then
+    PEAK_CPU_LIST=$(awk -F',' 'NR>1 && $3 ~ /[0-9]/ {print $2 ": " $3}' "$RESOURCE_LOG" | sort -t: -k2 -rn | head -5 | tr '\n' '; ')
+    PEAK_MEM_LIST=$(awk -F',' 'NR>1 && $4 ~ /[0-9]/ {print $2 ": " $4}' "$RESOURCE_LOG" | sort -t: -k2 -rn | head -5 | tr '\n' '; ')
+  fi
+  
+  # Build the prompt
+  local PROMPT="You are a Kubernetes scaling expert. Based on these metrics, provide ONLY scaling recommendations and cost analysis.
+
+METRICS:
+- Requests: $TOTAL_COUNT total, $FAILURE_COUNT failed (${SUCCESS_RATE}% success)
+- Duration: ${DURATION}s | Throughput: ${THROUGHPUT} req/s
+- Concurrency: $CONCURRENCY
+- Current Pods: $POD_COUNT
+- Peak CPU: ${PEAK_CPU_LIST:-N/A}
+- Peak Memory: ${PEAK_MEM_LIST:-N/A}
+
+Provide ONLY the following (be concise, use numbers):
+
+1. MISSED REQUESTS: Did we miss/fail any requests? If yes, why? (1 line)
+
+2. HORIZONTAL SCALING (Pod Count):
+   - Current: $POD_COUNT pods
+   - Recommended: [number] pods
+   - Reason: [1 line]
+
+3. VERTICAL SCALING (Resources per Pod):
+   - CPU Request/Limit: [recommended values like 100m/500m]
+   - Memory Request/Limit: [recommended values like 128Mi/512Mi]
+
+4. ESTIMATED SAVINGS:
+   - If using recommended settings: [X]% cost reduction
+   - Monthly estimate: Assuming \$0.05/pod/hour, current cost vs optimized cost
+
+Keep each section to 2-3 lines max. No disclaimers."
+
+  # Escape the prompt for JSON
+  local ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs .)
+  
+  # Call Ollama API
+  echo "Analyzing with $OLLAMA_MODEL..."
+  echo ""
+  
+  local RESPONSE=$(curl -s --max-time 60 "$OLLAMA_API/api/generate" \
+    -H "Content-Type: application/json" \
+    -d "{\"model\": \"$OLLAMA_MODEL\", \"prompt\": $ESCAPED_PROMPT, \"stream\": false}" 2>/dev/null)
+  
+  if [[ -z "$RESPONSE" ]]; then
+    echo "⚠️  No response from Ollama - model may be loading or unavailable"
+    return 0
+  fi
+  
+  # Extract the response text
+  local ANALYSIS=$(echo "$RESPONSE" | jq -r '.response // empty' 2>/dev/null)
+  
+  if [[ -n "$ANALYSIS" ]]; then
+    echo "----------------------------------------------"
+    echo "$ANALYSIS"
+    echo "----------------------------------------------"
+    echo ""
+    
+    # Save analysis to file for later reference
+    local ANALYSIS_FILE="/tmp/stress_analysis_$(date +%Y%m%d_%H%M%S).txt"
+    {
+      echo "Stress Test Analysis - $(date)"
+      echo "=============================================="
+      echo "Metrics:"
+      echo "  Requests: $TOTAL_COUNT (${SUCCESS_RATE}% success)"
+      echo "  Duration: ${DURATION}s | Throughput: ${THROUGHPUT} req/s"
+      echo "  Pods: $POD_COUNT"
+      echo ""
+      echo "AI Analysis:"
+      echo "$ANALYSIS"
+    } > "$ANALYSIS_FILE"
+    echo "📄 Analysis saved to: $ANALYSIS_FILE"
+  else
+    echo "⚠️  Could not parse Ollama response"
+    echo "Raw response: $RESPONSE"
+  fi
+}
+
+# Run Ollama analysis
+analyze_with_ollama
  
 # -----------------------------
 # Validation
