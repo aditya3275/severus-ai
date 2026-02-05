@@ -333,7 +333,7 @@ analyze_with_ollama() {
 
   # Build the prompt
   local PROMPT="You are a Kubernetes scaling expert. I have performed mathematical scaling calculations based on stress test metrics. 
-Summarize these results and explain the reasoning.
+Summarize these results and explain the reasoning and the solution to decrease the cost and increase the performance.
 
 CALCULATED METRICS:
 - Requests: $TOTAL_COUNT total, $FAILURE_COUNT failed (${SUCCESS_RATE}% success)
