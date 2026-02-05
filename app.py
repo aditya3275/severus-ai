@@ -13,6 +13,7 @@ from chat import (
 )
 from file_utils import save_uploaded_file, ensure_extracted_text
 from utils.ollama_client import chat_with_model
+from config.settings import DEFAULT_MODEL
 
 import time
 from metrics import MESSAGES_SENT, REQUEST_COUNT, REQUEST_LATENCY, APP_ERRORS, LOGIN_TOTAL
@@ -46,8 +47,8 @@ st.set_page_config(
 
 init_db()
 
-# Load model name from environment
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b")
+# Load model name from settings (centralized config)
+OLLAMA_MODEL = DEFAULT_MODEL
 
 # ======================================================
 # SESSION STATE (MINIMAL & SAFE)
