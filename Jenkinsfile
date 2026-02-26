@@ -196,6 +196,9 @@ pipeline {
                             POD=$($KUBECTL_BIN get pod -l app.kubernetes.io/name=severus-ai -o jsonpath="{.items[0].metadata.name}")
                             echo "Using pod: $POD"
 
+                            echo "⏳ Waiting for pod container to be Ready..."
+                            $KUBECTL_BIN wait pod/$POD --for=condition=Ready --timeout=120s
+
                             OLLAMA_URL=$($KUBECTL_BIN exec $POD -- sh -c 'echo $OLLAMA_BASE_URL')
 
                             if [ -z "$OLLAMA_URL" ]; then
