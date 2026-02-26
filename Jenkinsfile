@@ -175,6 +175,10 @@ pipeline {
                     steps {
                         sh '''
                             echo "🌐 Testing Ingress reachability..."
+
+                            echo "⏳ Waiting for deployment rollout..."
+                            $KUBECTL_BIN rollout status deployment/severus-ai --timeout=120s
+
                             # Try HTTP first, then HTTPS (with -k for local CA)
                             if curl --fail -s http://severus-ai.local; then
                                 echo "✅ Ingress reachable via HTTP"
